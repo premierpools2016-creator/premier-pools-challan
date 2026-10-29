@@ -1,0 +1,56 @@
+rules_version = '2';
+// Premier Pools Challan – database rules.
+// Paste this whole file into Firebase console → Firestore Database → Rules → Publish.
+// If the owner signs in with a different email, change it in isOwner() AND in config.js.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner() {
+      return signedIn() && request.auth.token.email != null
+        && request.auth.token.email.lower() in ['premierpools2016@gmail.com'];
+    }
+
+    // Company details, print setting, delete password: everyone reads, only the owner changes.
+    match /settings/{doc} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+    // Shared challan number counters.
+    match /counters/{id} {
+      allow read, create, update: if signedIn();
+      allow delete: if isOwner();
+    }
+    // Challans and payments are permanent: they can be created, never changed.
+    // Each one must carry the uid of the person who saved it. Only the owner can delete (Start fresh).
+    match /challans/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (request.resource.data.by == request.auth.uid || isOwner());
+      allow update: if false;
+      allow delete: if isOwner();
+    }
+    match /payments/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (request.resource.data.by == request.auth.uid || isOwner());
+      allow update: if false;
+      allow delete: if isOwner();
+    }
+    match /clients/{id} {
+      allow read, create, update: if signedIn();
+      allow delete: if isOwner();
+    }
+    // Staff can add new products; only the owner can change prices or delete.
+    match /products/{id} {
+      allow read, create: if signedIn();
+      allow update, delete: if isOwner();
+    }
+    // Each person's display name.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+    // Undo copy kept by "Start fresh".
+    match /trash/{id} {
+      allow read, write: if isOwner();
+    }
+  }
+}

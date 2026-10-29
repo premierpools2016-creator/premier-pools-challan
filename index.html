@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Premier Pools Challan</title>
+<meta name="theme-color" content="#0a6f8a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PP Challan">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: top bar + tabs; stacked form cards; ledger view with summary tiles */
+:root{
+  --bg:#f3f7f8; --panel:#ffffff; --ink:#14262c; --muted:#5b7179; --line:#d5e2e5;
+  --accent:#0a6f8a; --accent-ink:#ffffff; --tile:#e3f1f4; --warn:#b4471f; --ok:#1f7a4d; --wa:#1c8a4a;
+  --display:"Archivo",system-ui,sans-serif; --body:"Source Sans 3",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0e1a1e; --panel:#15252a; --ink:#e4eff1; --muted:#93aab1; --line:#28403f;
+  --accent:#3fb3d0; --accent-ink:#06222a; --tile:#1b3238; --warn:#f08a62; --ok:#5fcf93; --wa:#4fd08a; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
+header{background:var(--accent);color:var(--accent-ink);padding:14px max(16px,env(safe-area-inset-left))}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.acct{display:flex;align-items:center;gap:8px;font-size:.85rem}
+.acct .btn{padding:5px 10px;font-size:.8rem;background:transparent;color:var(--accent-ink);border-color:var(--accent-ink)}
+.net{display:inline-block;padding:2px 8px;border-radius:99px;background:var(--warn);color:#fff;font-size:.75rem;font-weight:600}
+body.staff .adm{display:none!important}
+.gate{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:auto;padding:24px max(16px,env(safe-area-inset-left,0px))}
+.gate-box{width:100%;max-width:380px;display:flex;flex-direction:column;gap:14px}
+.gate-box h1{font:800 1.7rem var(--display);letter-spacing:.06em;margin:0;color:var(--accent)}
+.gate-box .err{color:var(--warn);font-weight:600;margin:0;min-height:1.2em}
+.linkbtn{background:none;border:0;color:var(--accent);font:600 .9rem var(--body);padding:0;cursor:pointer;text-align:left}
+header h1{margin:0;font:800 1.3rem var(--display);letter-spacing:.06em}
+header p{margin:2px 0 0;font-size:.85rem;opacity:.85}
+nav{display:flex;gap:2px;overflow-x:auto;background:var(--panel);border-bottom:1px solid var(--line);padding:0 10px;position:sticky;top:0;z-index:5}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:12px 12px;font:600 .95rem var(--body);color:var(--muted);cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--accent);border-color:var(--accent)}
+main{max-width:1000px;margin:0 auto;padding:18px 16px 80px}
+section{display:none}section.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.card.done{border:2px solid var(--ok)}
+h2{font:700 1.05rem var(--display);margin:0 0 12px;letter-spacing:.02em}
+h3{font:700 .95rem var(--display);margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+label{display:block;font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px}
+input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font:600 .95rem var(--body);cursor:pointer;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.sm{padding:6px 10px;font-size:.85rem}
+.btn.danger{border-color:var(--warn);color:var(--warn);background:transparent}
+.btn.wa{border-color:var(--wa);color:var(--wa);background:transparent}
+.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td.n,th.n{text-align:right}
+.items td input{padding:8px}
+.items{min-width:620px}
+.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.tot{background:var(--tile);border-radius:8px;padding:10px 12px}
+.tot span{display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.tot b{font:700 1.25rem var(--mono)}
+.tot.due b{color:var(--warn)}.tot.paid b{color:var(--ok)}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.78rem;font-weight:600;background:var(--tile);white-space:nowrap}
+.pill.due{color:var(--warn)}.pill.clear{color:var(--ok)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.hint{font-size:.85rem;color:var(--muted)}
+.cno{font:500 .95rem var(--mono);white-space:nowrap}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--tile)}
+.lg-ch td{font-weight:600}
+.money{font-family:var(--mono)}
+main td:first-child{white-space:nowrap}
+#lgRows,#histRows,#payRows,#cliRows{}
+main .tbl table{min-width:600px}
+
+/* ---------- PRINT ---------- */
+#printArea{display:none}
+.pc{border:1.5px solid #000;padding:0;page-break-inside:avoid}
+.pc .hd{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 14px;border-bottom:1.5px solid #000;gap:12px}
+.pc .hd h1{font:800 20pt var(--display);margin:0;letter-spacing:.05em}
+.pc .hd .ttl{text-align:right;white-space:nowrap}
+.pc .hd .ttl b{display:block;font:700 12pt var(--display);border:1.5px solid #000;padding:3px 10px;margin-bottom:4px}
+.pc .meta{display:grid;grid-template-columns:1.3fr 1fr;border-bottom:1.5px solid #000}
+.pc .meta>div{padding:8px 14px}
+.pc .meta>div+div{border-left:1.5px solid #000}
+.pc table{width:100%;border-collapse:collapse}
+.pc th,.pc td{border:1px solid #000;padding:5px 7px;font-size:10.5pt;color:#000;text-transform:none;letter-spacing:0}
+.pc th{background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pc .pay{display:grid;grid-template-columns:1fr 1fr}
+.pc .pay>div{padding:8px 14px}
+.pc .pay>div+div{border-left:1.5px solid #000}
+.pc .pay table td{border:0;padding:2px 0}
+.pc .sig{display:flex;justify-content:space-between;padding:40px 14px 10px;border-top:1.5px solid #000}
+.pc .sig div{border-top:1px solid #000;padding-top:3px;min-width:180px;text-align:center;font-size:10pt}
+.pc .copy{font-size:9pt;text-align:right;padding:2px 6px}
+.pc + .pc{margin-top:8mm}
+/* on-screen preview */
+.pv{position:fixed;inset:0;z-index:30;background:rgba(8,20,24,.6);display:flex;align-items:flex-start;justify-content:center;overflow:auto;
+  padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.pv-box{background:var(--panel);border-radius:12px;max-width:820px;width:100%;padding:14px;display:flex;flex-direction:column;gap:12px}
+.pv-wrap{background:var(--tile);border-radius:8px;padding:10px;overflow:hidden}
+#pvPaper{background:#fff;color:#000;font:11pt/1.35 var(--body);width:760px;padding:24px;transform-origin:top left}
+.pv-warn{margin:0;font-weight:600;color:var(--warn)}
+@media print{
+  @page{size:A4;margin:12mm}
+  body{background:#fff;color:#000}
+  header,nav,main,.toast{display:none!important}
+  #printArea{display:block;font:11pt/1.35 var(--body);color:#000}
+  /* two copies on one A4 sheet */
+  @page{size:A4;margin:8mm 10mm}
+  .half{height:136mm;display:flex;flex-direction:column;overflow:hidden}
+  .half .pc{flex:1;display:flex;flex-direction:column}
+  .half .pc .sig{margin-top:auto}
+  .pc.cmp{font-size:9pt;line-height:1.18}
+  .pc.cmp .hd{padding:4px 10px}
+  .pc.cmp .hd h1{font-size:14pt;line-height:1.1}
+  .pc.cmp .hd .ttl b{font-size:10pt;padding:1px 8px;margin-bottom:2px}
+  .pc.cmp .meta>div,.pc.cmp .pay>div{padding:3px 10px}
+  .pc.cmp th,.pc.cmp td{padding:1.5px 6px;font-size:9pt}
+  .pc.cmp .pay table td{padding:0}
+  .pc.cmp .sig{padding:16px 10px 4px}
+  .pc.cmp .sig div{font-size:8.5pt}
+  .pc.cmp .copy{font-size:7.5pt;padding:1px 6px;line-height:1}
+  .cut{position:relative;border-top:1.5px dashed #000;margin:4mm 0;height:0}
+  .cut span{position:absolute;left:50%;top:-6pt;transform:translateX(-50%);background:#fff;padding:0 8px;font-size:8pt;letter-spacing:.1em}
+}
+</style>
+</head>
+<body>
+<header>
+  <div><h1 id="hName">PREMIER POOLS</h1>
+  <p>Delivery Challan &amp; Client Accounts</p></div>
+  <div class="acct"><span class="net" id="net" hidden>Offline</span><span id="who"></span><button class="btn" id="btnOut">Sign out</button></div>
+</header>
+<nav>
+  <button data-tab="new" class="on">New Challan</button>
+  <button data-tab="hist">Challans</button>
+  <button data-tab="pay">Payments</button>
+  <button data-tab="cli">Clients</button>
+  <button data-tab="prod">Products</button>
+  <button data-tab="set">Settings</button>
+</nav>
+
+<main>
+<!-- NEW CHALLAN -->
+<section id="new" class="on">
+  <div class="card done" id="lastSaved" hidden>
+    <div class="row" style="justify-content:space-between">
+      <div><strong>Saved &amp; locked:</strong> <span class="cno" id="lsNo"></span> · <span id="lsClient"></span></div>
+      <div class="row"><button class="btn wa sm" id="lsWa">Send on WhatsApp</button><button class="btn ghost sm" id="lsPrint">Print again</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div><label for="cCompany">Company</label><select id="cCompany"></select></div>
+      <div><label>Challan no. (automatic)</label><div class="cno" id="cNo" style="padding:10px 0;font-size:1.1rem"></div></div>
+      <div><label for="cDate">Date</label><input type="date" id="cDate"></div>
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <div><label for="cClient">Client name</label><input id="cClient" list="dlClients" placeholder="Type or pick a client"></div>
+      <div><label for="cPhone">Client mobile (for WhatsApp)</label><input id="cPhone" inputmode="tel"></div>
+      <div><label for="cAddr">Site / Address</label><input id="cAddr"></div>
+    </div>
+    <p class="hint" id="cBal" style="margin:10px 0 0"></p>
+  </div>
+
+  <div class="card">
+    <h2>Items</h2>
+    <div class="tbl"><table class="items">
+      <thead><tr><th style="width:52px">Sr. No.</th><th>Product name</th><th class="n" style="width:80px">Qty</th><th class="n" style="width:110px">Price ₹</th><th class="n" style="width:110px">Amount ₹</th><th style="width:40px"></th></tr></thead>
+      <tbody id="itemRows"></tbody>
+    </table></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost sm" id="btnAddRow">+ Add item</button></div>
+  </div>
+
+  <div class="card">
+    <h2>Delivery</h2>
+    <div class="grid">
+      <div><label for="dMode">Mode of delivery</label>
+        <select id="dMode"><option>Take Away</option><option>Porter</option><option>Rickshaw</option><option>Delivery by Self</option><option>Delivery by Person</option></select></div>
+      <div id="dNameBox"><label for="dName" id="dNameLbl">Picked up by (name)</label><input id="dName"></div>
+      <div id="dMobBox"><label for="dMobile" id="dMobLbl">Mobile number</label><input id="dMobile" inputmode="tel" maxlength="15"></div>
+      <div id="vehBox"><label for="dVeh">Vehicle no.</label><input id="dVeh" placeholder="Optional"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Payment at delivery</h2>
+    <div class="grid">
+      <div><label for="pPaid">Amount received now ₹</label><input type="number" id="pPaid" min="0" step="0.01" value="0"></div>
+      <div><label for="pMode">Mode of payment</label>
+        <select id="pMode"><option>Cash</option><option>Online</option><option>Cheque</option></select></div>
+      <div id="refBox"><label for="pRef" id="pRefLbl">Reference</label><input id="pRef"></div>
+      <div><label for="pRecv">Payment receiver name</label><input id="pRecv" list="dlRecv"></div>
+    </div>
+    <div class="totals">
+      <div class="tot"><span>Total amount</span><b id="tTotal">₹0.00</b></div>
+      <div class="tot paid"><span>Received</span><b id="tPaid">₹0.00</b></div>
+      <div class="tot due"><span>Remaining</span><b id="tDue">₹0.00</b></div>
+    </div>
+    <p class="hint">If the client pays later, record it in the Payments tab.</p>
+    <div style="margin-top:12px"><label for="cNote">Remarks</label><input id="cNote" placeholder="Optional"></div>
+  </div>
+
+  <div class="row">
+    <button class="btn" id="btnPreview">Preview challan</button>
+    <button class="btn ghost" id="btnReset">Clear form</button>
+  </div>
+  <p class="hint">Tap Preview to see the challan exactly as it will print. You can go back and change anything until you confirm. After you confirm, it is saved permanently and cannot be changed. Print opens your phone or computer's print screen; pick your WiFi printer there.</p>
+</section>
+
+<!-- CHALLANS -->
+<section id="hist">
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Saved challans</h2>
+      <div class="row"><select id="hCompany" style="width:auto"></select><input id="hSearch" placeholder="Search client or challan no." style="max-width:260px"></div></div>
+    <div class="tbl" style="margin-top:12px"><table>
+      <thead><tr><th>No.</th><th>Date</th><th>Client</th><th class="n">Total</th><th class="n">Balance</th><th>Delivery</th><th></th></tr></thead>
+      <tbody id="histRows"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- PAYMENTS -->
+<section id="pay">
+  <div class="card">
+    <h2>Record payment received</h2>
+    <div class="grid">
+      <div><label for="yDate">Date</label><input type="date" id="yDate"></div>
+      <div><label for="yClient">Client name</label><input id="yClient" list="dlClients" placeholder="Pick a client"></div>
+      <div><label for="yCompany">Company</label><select id="yCompany"></select></div>
+      <div><label for="yChallan">Against challan</label><select id="yChallan"></select></div>
+    </div>
+    <p class="hint" id="yBal" style="margin:10px 0 0"></p>
+    <div class="grid" style="margin-top:12px">
+      <div><label for="yAmt">Amount received ₹</label><input type="number" id="yAmt" min="0" step="0.01"></div>
+      <div><label for="yMode">Mode of payment</label><select id="yMode"><option>Cash</option><option>Online</option><option>Cheque</option></select></div>
+      <div id="yRefBox"><label for="yRef" id="yRefLbl">Reference</label><input id="yRef"></div>
+      <div><label for="yRecv">Payment receiver name</label><input id="yRecv" list="dlRecv"></div>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btnSavePay">Save payment</button></div>
+    <p class="hint">Saved payments are locked like challans.</p>
+  </div>
+  <div class="card">
+    <h2>Payments received</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Date</th><th>Client</th><th>Against</th><th class="n">Amount</th><th>Mode</th><th>Received by</th><th></th></tr></thead>
+      <tbody id="payRows"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- CLIENTS -->
+<section id="cli">
+  <div id="cliList">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">Client master list</h2>
+        <input id="cSearch" placeholder="Search client" style="max-width:240px"></div>
+      <div class="totals" id="cliSum"></div>
+      <div class="tbl" style="margin-top:12px"><table>
+        <thead><tr><th>Client</th><th>Mobile</th><th class="n">Purchases</th><th class="n">Paid</th><th class="n">Balance</th><th></th></tr></thead>
+        <tbody id="cliRows"></tbody>
+      </table></div>
+      <p class="hint">Tap a client to see their full purchase and payment history.</p>
+    </div>
+    <div class="card">
+      <h2>Add client</h2>
+      <div class="grid">
+        <div><label for="ncName">Client name</label><input id="ncName"></div>
+        <div><label for="ncPhone">Mobile</label><input id="ncPhone" inputmode="tel"></div>
+        <div><label for="ncAddr">Address</label><input id="ncAddr"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="btn" id="btnAddCli">Add client</button></div>
+    </div>
+  </div>
+
+  <div id="cliLedger" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <button class="btn ghost sm" id="lgBack">← All clients</button>
+        <select id="lgCompany" style="width:auto"></select>
+      </div>
+      <h2 id="lgName" style="margin:14px 0 8px;font-size:1.3rem"></h2>
+      <div class="grid">
+        <div><label for="lgPhone">Mobile</label><input id="lgPhone" inputmode="tel"></div>
+        <div><label for="lgAddr">Address</label><input id="lgAddr"></div>
+      </div>
+      <div class="totals" id="lgSum"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" id="lgPay">Record payment</button>
+        <button class="btn wa" id="lgWa">WhatsApp statement</button>
+        <button class="btn ghost" id="lgPrint">Print statement</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Purchase &amp; payment history</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Date</th><th>Details</th><th class="n">Purchase ₹</th><th class="n">Paid ₹</th><th class="n">Balance ₹</th><th></th></tr></thead>
+        <tbody id="lgRows"></tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRODUCTS -->
+<section id="prod">
+  <div class="card">
+    <h2>Add product</h2>
+    <div class="grid">
+      <div><label for="npName">Product name</label><input id="npName" placeholder="e.g. Sand filter 24 inch"></div>
+      <div><label for="npUnit">Unit</label><input id="npUnit" placeholder="Nos / Kg / Bag"></div>
+      <div><label for="npPrice">Price ₹</label><input type="number" id="npPrice" min="0" step="0.01"></div>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btnAddProd">Add product</button></div>
+  </div>
+  <div class="card"><h2>Product list</h2>
+    <div class="tbl"><table><thead><tr><th>Name</th><th>Unit</th><th class="n">Price ₹</th><th></th></tr></thead><tbody id="prodRows"></tbody></table></div>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section id="set">
+  <div class="card">
+    <h2>Your account</h2>
+    <p class="hint" id="acctInfo" style="margin-top:0"></p>
+    <div class="grid"><div><label for="myNameIn">Your name (shown on challans you make)</label><input id="myNameIn"></div></div>
+    <div class="row" style="margin-top:12px"><button class="btn ghost" id="btnMyName">Save name</button></div>
+  </div>
+  <div id="coCards" class="adm"></div>
+  <div class="card adm">
+    <h2>Printing</h2>
+    <div class="grid"><div><label for="sCopies">Copies per print</label><select id="sCopies"><option value="1">1 (single)</option><option value="2">2 on one page (Original + Duplicate, with cutting line)</option></select></div></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btnSaveSet">Save settings</button></div>
+    <p class="hint">Challan numbers run automatically for each company. Give each company a different prefix.</p>
+  </div>
+  <div class="card adm">
+    <h2>Backup</h2>
+    <p class="hint">Data is stored online and shared by all logins. Download a backup now and then to keep your own copy. "Restore backup" also brings in data from the old single-phone version of the app; challans that already exist are skipped.</p>
+    <div class="row"><button class="btn ghost" id="btnExport">Download backup</button>
+      <label class="btn ghost" style="margin:0;text-transform:none;letter-spacing:0;font-size:.95rem">Restore backup<input type="file" id="fImport" accept=".json" hidden></label></div>
+  </div>
+  <div class="card adm">
+    <h2>Delete password</h2>
+    <p class="hint" id="pwState"></p>
+    <div class="grid">
+      <div id="pwOldBox"><label for="pwOld">Current password</label><input type="password" id="pwOld" autocomplete="current-password"></div>
+      <div><label for="pwNew">New password</label><input type="password" id="pwNew" autocomplete="new-password"></div>
+      <div><label for="pwNew2">Repeat new password</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btnPw">Set password</button></div>
+  </div>
+
+  <div class="card adm">
+    <h2>Start fresh</h2>
+    <p class="hint">Deletes all challans, payments, clients and products for everyone. Company details and the password are kept. You can undo this with "Restore deleted data".</p>
+    <div class="grid">
+      <div><label for="wPass">Delete password</label><input type="password" id="wPass" autocomplete="off"></div>
+      <div><label for="wWord">Type DELETE to confirm</label><input id="wWord" autocomplete="off" autocapitalize="characters"></div>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="btn danger" id="btnWipe">Delete all data</button></div>
+    <div id="trashBox" hidden style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+      <p class="hint" id="trashInfo" style="margin-top:0"></p>
+      <button class="btn" id="btnUndo">Restore deleted data</button>
+    </div>
+  </div>
+</section>
+</main>
+
+<datalist id="dlClients"></datalist><datalist id="dlProducts"></datalist><datalist id="dlRecv"></datalist>
+<div class="pv" id="pv" hidden role="dialog" aria-modal="true" aria-labelledby="pvTitle">
+  <div class="pv-box">
+    <h2 id="pvTitle" style="margin:0">Check the challan</h2>
+    <div class="pv-wrap" id="pvWrap"><div id="pvPaper"></div></div>
+    <p class="pv-warn">After you confirm, this challan is saved permanently and cannot be changed.</p>
+    <div class="row">
+      <button class="btn" id="pvPrint">Confirm, save &amp; print</button>
+      <button class="btn ghost" id="pvSave">Confirm &amp; save</button>
+      <button class="btn danger" id="pvBack">← Back to edit</button>
+    </div>
+  </div>
+</div>
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <div><h1>PREMIER POOLS</h1><p class="hint" style="margin:4px 0 0">Delivery Challan</p></div>
+    <div id="gLoad"><p class="hint">Loading…</p></div>
+    <form id="gLogin" hidden novalidate>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div><label for="gEmail">Email</label><input type="email" id="gEmail" autocomplete="username" inputmode="email"></div>
+        <div><label for="gPass">Password</label><input type="password" id="gPass" autocomplete="current-password"></div>
+        <p class="err" id="gErr"></p>
+        <button class="btn" type="submit" id="gBtn" style="justify-content:center">Sign in</button>
+        <button class="linkbtn" type="button" id="gForgot">Forgot password?</button>
+        <p class="hint" style="margin:0">Logins are created by the owner. Ask the owner if you need one.</p>
+      </div>
+    </form>
+    <form id="gName" hidden novalidate>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0">Welcome! Enter your name. It is shown on every challan and payment you save.</p>
+        <div><label for="gNameIn">Your name</label><input id="gNameIn" autocomplete="name"></div>
+        <button class="btn" type="submit" style="justify-content:center">Continue</button>
+      </div>
+    </form>
+    <div id="gSetup" hidden>
+      <p><strong>The app is not connected to its online database yet.</strong></p>
+      <p class="hint">Open <code>config.js</code> and paste your Firebase settings, as shown in the setup guide.</p>
+    </div>
+  </div>
+</div>
+<div id="printArea"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const r2=n=>Math.round((+n||0)*100)/100;
+const num=n=>(+n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const inr=n=>'₹'+num(n);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+const fmtDate=s=>s?s.split('-').reverse().join('-'):'';
+const key=s=>String(s||'').trim().toLowerCase();
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),3000);}
+const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:v;}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
+
+/* ---------- config & state ---------- */
+const CFG=window.PP_CONFIG||{};
+const ADMINS=(CFG.adminEmails||[]).map(key);
+function blankCo(id,name,prefix,email){return {id,name,addr:'',phone:'',email:email||'',gst:'',prefix};}
+function defaultCos(){return [blankCo(1,'PREMIER POOLS','PP/DC/','premierpools2016@gmail.com'),blankCo(2,'','B/DC/'),blankCo(3,'','C/DC/')];}
+let db={companies:defaultCos(),copies:'2',delPass:'',products:[],clients:[],challans:[],payments:[],trash:[]};
+let fs=null,auth=null,me=null,isAdmin=false,myName='',subs=[];
+let activeCompany=+LS.get('pp_activeCompany',1)||1;
+const strip=o=>{const {_id,...rest}=o;return rest;};
+function fail(e){console.error(e);toast(e&&e.code==='permission-denied'?'Not allowed for your login. Ask the owner.':'Could not save. Check internet and try again.');}
+const write=p=>p.catch(fail);
+
+/* ---------- derived data ---------- */
+const coById=id=>db.companies.find(c=>c.id===+id)||db.companies[0];
+const activeCos=()=>db.companies.filter(c=>(c.name||'').trim());
+const nextSeq=cid=>Math.max(0,...db.challans.filter(c=>c.companyId===+cid).map(c=>c.seq||0))+1;
+const fmtNo=(co,seq)=>co.prefix+String(seq).padStart(4,'0');
+const laterPaid=c=>db.payments.filter(p=>p.challanId===c.id).reduce((a,p)=>a+p.amount,0);
+const dueOf=c=>Math.max(0,r2(c.total-c.paid-laterPaid(c)));
+const findClient=n=>db.clients.find(c=>key(c.name)===key(n));
+function clientTotals(name,cid){
+  const ch=db.challans.filter(c=>key(c.client)===key(name)&&(!cid||c.companyId===+cid));
+  const py=db.payments.filter(p=>key(p.client)===key(name)&&(!cid||p.companyId===+cid));
+  const purchases=ch.reduce((a,c)=>a+c.total,0);
+  const paid=ch.reduce((a,c)=>a+c.paid,0)+py.reduce((a,p)=>a+p.amount,0);
+  return {ch,py,purchases:r2(purchases),paid:r2(paid),bal:r2(purchases-paid)};
+}
+function clientPhone(name,fallback){return fallback||findClient(name)?.phone||'';}
+
+/* ---------- WhatsApp ---------- */
+function waOpen(phone,text){
+  let d=String(phone||'').replace(/\D/g,'');
+  if(d.length===10)d='91'+d;
+  if(d.length===12&&d.startsWith('0'))d=d.slice(1);
+  if(d.length<11){toast('Add the client mobile number first');return;}
+  window.open('https://wa.me/'+d+'?text='+encodeURIComponent(text),'_blank');
+}
+function challanText(c){
+  const co=c.co||coById(c.companyId);const later=laterPaid(c);const due=dueOf(c);
+  let t=`*${co.name}*\nDelivery Challan No: *${c.no}*\nDate: ${fmtDate(c.date)}\nTo: ${c.client}\n\n`;
+  t+=c.items.map((it,i)=>`${i+1}. ${it.name} - ${it.qty} x ₹${num(it.price)} = ₹${num(it.qty*it.price)}`).join('\n');
+  t+=`\n\n*Total: ₹${num(c.total)}*\nReceived at delivery: ₹${num(c.paid)}${c.paid>0?' ('+c.mode+')':''}`;
+  if(later>0)t+=`\nReceived later: ₹${num(later)}`;
+  t+=`\n*Balance: ₹${num(due)}*`;
+  t+=`\n\nDelivery: ${c.dMode||''}${c.dName?' - '+c.dName:''}${c.dMobile?' ('+c.dMobile+')':''}${c.dVeh?', Vehicle '+c.dVeh:''}`;
+  const all=clientTotals(c.client,c.companyId).bal;
+  if(r2(all)!==due&&all>0)t+=`\nTotal outstanding with us: ₹${num(all)}`;
+  t+=`\n\nThank you,\n${co.name}${co.phone?'\n'+co.phone:''}`;
+  return t;
+}
+function paymentText(p){
+  const co=coById(p.companyId);const ch=db.challans.find(c=>c.id===p.challanId);
+  const bal=clientTotals(p.client,p.companyId).bal;
+  return `*${co.name}*\nPayment received - thank you!\n\nClient: ${p.client}\nDate: ${fmtDate(p.date)}\nAmount: *₹${num(p.amount)}*\nMode: ${p.mode}${p.ref?' ('+p.ref+')':''}\nAgainst: ${ch?'Challan '+ch.no:'On account'}${p.recv?'\nReceived by: '+p.recv:''}\n\n*Your balance: ₹${num(bal)}*`;
+}
+
+/* ---------- tabs ---------- */
+let curTab='new';
+function go(tab){
+  curTab=tab;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.tab===tab));
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===tab));
+  ({hist:renderHist,pay:()=>{fillPayChallans();renderPays();},cli:()=>{$('cliLedger').hidden?renderCli():renderLedger();},prod:renderProd,set:loadSet})[tab]?.();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
+
+/* ---------- shared lists ---------- */
+function coOptions(sel,withAll){
+  const cur=sel.value;
+  sel.innerHTML=(withAll?'<option value="">All companies</option>':'')+activeCos().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+}
+function refreshLists(){
+  $('dlClients').innerHTML=db.clients.map(c=>`<option value="${esc(c.name)}">`).join('');
+  $('dlProducts').innerHTML=db.products.map(p=>`<option value="${esc(p.name)}">`).join('');
+  const r=[...new Set([...db.challans.map(c=>c.recv),...db.payments.map(p=>p.recv)].filter(Boolean))];
+  $('dlRecv').innerHTML=r.map(x=>`<option value="${esc(x)}">`).join('');
+  coOptions($('cCompany'));coOptions($('yCompany'));coOptions($('hCompany'),true);coOptions($('lgCompany'),true);
+  if([...$('cCompany').options].some(o=>o.value==activeCompany))$('cCompany').value=activeCompany;
+  $('hName').textContent=coById($('cCompany').value).name||'PREMIER POOLS';
+}
+
+/* ---------- new challan form ---------- */
+function showNo(){const co=coById($('cCompany').value);$('cNo').textContent=fmtNo(co,nextSeq(co.id));$('hName').textContent=co.name;}
+$('cCompany').onchange=()=>{activeCompany=+$('cCompany').value;LS.set('pp_activeCompany',activeCompany);showNo();showClientBal();};
+function delivUI(){
+  const m=$('dMode').value;
+  const porter=m==='Porter';
+  $('dNameBox').hidden=porter;$('dMobBox').hidden=porter;
+  $('dNameLbl').textContent=m==='Take Away'?'Picked up by (name)':m==='Delivery by Self'?'Delivered by (staff name)':'Delivery person name';
+  $('dMobLbl').textContent=m==='Take Away'?'Pickup person mobile':'Delivery person mobile';
+  $('vehBox').hidden=m==='Take Away';
+}
+$('dMode').onchange=delivUI;
+function addRow(it={}){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="sr"></td>
+    <td><input class="iName" list="dlProducts" value="${esc(it.name||'')}" placeholder="Product"></td>
+    <td><input class="iQty" type="number" min="0" step="any" value="${it.qty??1}" style="text-align:right"></td>
+    <td><input class="iPrice" type="number" min="0" step="0.01" value="${it.price??''}" style="text-align:right"></td>
+    <td class="n iAmt">0.00</td>
+    <td><button class="btn danger sm" aria-label="Remove item">✕</button></td>`;
+  tr.querySelector('.iName').addEventListener('change',e=>{
+    const p=db.products.find(p=>key(p.name)===key(e.target.value));
+    if(p){tr.querySelector('.iPrice').value=p.price;calc();}
+  });
+  tr.querySelector('button').onclick=()=>{tr.remove();if(!$('itemRows').children.length)addRow();calc();};
+  tr.addEventListener('input',calc);
+  $('itemRows').appendChild(tr);calc();
+}
+function readItems(){
+  return [...$('itemRows').children].map(tr=>({name:tr.querySelector('.iName').value.trim(),qty:+tr.querySelector('.iQty').value||0,price:+tr.querySelector('.iPrice').value||0})).filter(i=>i.name);
+}
+function calc(){
+  let total=0;
+  [...$('itemRows').children].forEach((tr,i)=>{
+    tr.querySelector('.sr').textContent=i+1;
+    const a=(+tr.querySelector('.iQty').value||0)*(+tr.querySelector('.iPrice').value||0);
+    tr.querySelector('.iAmt').textContent=num(a);total+=a;
+  });
+  total=r2(total);const paid=r2($('pPaid').value);
+  $('tTotal').textContent=inr(total);$('tPaid').textContent=inr(paid);$('tDue').textContent=inr(Math.max(total-paid,0));
+  return {total,paid};
+}
+function refUI(modeSel,box,lbl){const m=$(modeSel).value;$(box).hidden=m==='Cash';$(lbl).textContent=m==='Cheque'?'Cheque no. & bank':'UPI / Transaction ID';}
+$('pMode').onchange=()=>refUI('pMode','refBox','pRefLbl');$('pPaid').oninput=calc;
+function showClientBal(){
+  const n=$('cClient').value.trim();
+  if(!n){$('cBal').textContent='';return;}
+  const t=clientTotals(n,$('cCompany').value);
+  $('cBal').innerHTML=t.ch.length?`Previous balance of this client: <strong style="color:var(--warn)">${inr(t.bal)}</strong> (${t.ch.length} challan${t.ch.length>1?'s':''})`:'New client. They will be added to the client list when you save.';
+}
+$('cClient').addEventListener('change',()=>{
+  const c=findClient($('cClient').value);
+  if(c){$('cPhone').value=c.phone||'';$('cAddr').value=c.addr||'';}
+  showClientBal();
+});
+$('btnAddRow').onclick=()=>addRow();
+function resetForm(){
+  showNo();$('cDate').value=today();
+  ['cClient','cPhone','cAddr','pRef','pRecv','cNote','dName','dMobile','dVeh'].forEach(i=>$(i).value='');
+  $('pPaid').value=0;$('pMode').value='Cash';$('dMode').value='Take Away';$('itemRows').innerHTML='';addRow();
+  refUI('pMode','refBox','pRefLbl');delivUI();showClientBal();unarm();
+}
+$('btnReset').onclick=()=>{resetForm();$('lastSaved').hidden=true;};
+
+function collect(){
+  const items=readItems();
+  if(!activeCos().length){toast('The owner must add a company name in Settings first');return null;}
+  if(!$('cClient').value.trim()){toast('Enter the client name');return null;}
+  if(!items.length){toast('Add at least one product');return null;}
+  const m=$('dMode').value;
+  if(m!=='Porter'){
+    if(!$('dName').value.trim()){toast('Enter the '+$('dNameLbl').textContent.toLowerCase());return null;}
+    if($('dMobile').value.replace(/\D/g,'').length<10){toast('Enter a 10-digit mobile number for delivery / pickup');return null;}
+  }
+  const t=calc();
+  const co=coById($('cCompany').value);const seq=nextSeq(co.id);
+  return {id:Date.now(),companyId:co.id,seq,no:fmtNo(co,seq),co:{...co},locked:true,
+    date:$('cDate').value,client:$('cClient').value.trim(),phone:$('cPhone').value.trim(),addr:$('cAddr').value.trim(),
+    items,total:t.total,paid:t.paid,mode:t.paid>0?$('pMode').value:'Pending',ref:t.paid>0&&$('pMode').value!=='Cash'?$('pRef').value.trim():'',
+    recv:$('pRecv').value.trim(),note:$('cNote').value.trim(),
+    dMode:m,dName:m==='Porter'?'':$('dName').value.trim(),dMobile:m==='Porter'?'':$('dMobile').value.trim(),dVeh:m==='Take Away'?'':$('dVeh').value.trim()};
+}
+/* two-tap confirm (payments) */
+let armed=null;
+function unarm(){document.querySelectorAll('[data-orig]').forEach(b=>b.textContent=b.dataset.orig);armed=null;}
+function confirmTap(btn){
+  if(armed===btn){unarm();return true;}
+  unarm();armed=btn;btn.dataset.orig=btn.dataset.orig||btn.textContent;btn.textContent='Tap again to confirm (cannot edit later)';
+  setTimeout(()=>{if(armed===btn)unarm();},4000);return false;
+}
+
+/* challan numbers come from a shared counter, so two phones never get the same number */
+function withTimeout(p,ms){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),ms))]);}
+async function saveChallanCloud(c){
+  const cid=c.companyId,co=coById(cid);
+  const cRef=fs.collection('counters').doc(String(cid));
+  const localMax=nextSeq(cid)-1;
+  return fs.runTransaction(async tx=>{
+    const cs=await tx.get(cRef);
+    let seq=Math.max(cs.exists?(cs.data().seq||0):0,localMax)+1;
+    let ref=fs.collection('challans').doc(cid+'_'+seq);
+    let ex=await tx.get(ref);
+    while(ex.exists){seq++;ref=fs.collection('challans').doc(cid+'_'+seq);ex=await tx.get(ref);}
+    const doc={...c,seq,no:fmtNo(co,seq),by:me.uid,byName:myName,savedAt:Date.now()};
+    tx.set(cRef,{seq});tx.set(ref,doc);
+    return doc;
+  });
+}
+function upsertClientAndProducts(c){
+  const cl=findClient(c.client);
+  if(!cl)write(fs.collection('clients').add({name:c.client,phone:c.phone,addr:c.addr}));
+  else if((!cl.phone&&c.phone)||(!cl.addr&&c.addr))write(fs.collection('clients').doc(cl._id).update({phone:cl.phone||c.phone,addr:cl.addr||c.addr}));
+  const seen=new Set(db.products.map(p=>key(p.name)));
+  c.items.forEach(it=>{if(!seen.has(key(it.name))){seen.add(key(it.name));write(fs.collection('products').add({name:it.name,unit:'Nos',price:it.price}));}});
+}
+let lastId=null;
+function afterSave(c){lastId=c.id;$('lsNo').textContent=c.no;$('lsClient').textContent=c.client;$('lastSaved').hidden=false;resetForm();window.scrollTo(0,0);}
+/* preview -> confirm -> permanent save */
+let pending=null,saving=false;
+function fitPreview(){const w=$('pvWrap').clientWidth-20,pp=$('pvPaper');const k=Math.min(1,w/pp.offsetWidth);
+  pp.style.transform='scale('+k+')';$('pvWrap').style.height=(pp.offsetHeight*k+20)+'px';}
+function closePreview(){$('pv').hidden=true;pending=null;document.body.style.overflow='';}
+$('btnPreview').onclick=()=>{
+  pending=collect();if(!pending)return;
+  $('pvPaper').innerHTML=challanHTML(pending,'');
+  $('pv').hidden=false;document.body.style.overflow='hidden';fitPreview();$('pv').scrollTop=0;$('pvPrint').focus();
+};
+window.addEventListener('resize',()=>{if(!$('pv').hidden)fitPreview();});
+$('pvBack').onclick=()=>{if(!saving)closePreview();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('pv').hidden&&!saving)closePreview();});
+function setSaving(on){saving=on;['pvPrint','pvSave','pvBack'].forEach(i=>$(i).disabled=on);$('pvSave').textContent=on?'Saving…':'Confirm & save';}
+async function confirmSave(print){
+  if(!pending||saving)return;
+  if(!navigator.onLine)return toast('No internet. A challan needs internet to get its number. Connect and tap Confirm again.');
+  setSaving(true);
+  try{
+    const planned=pending.no;
+    const doc=await withTimeout(saveChallanCloud(pending),20000);
+    upsertClientAndProducts(doc);
+    closePreview();afterSave(doc);
+    if(print)printChallan(doc);
+    toast(doc.no!==planned?`Saved as ${doc.no} (another challan took ${planned})`:'Saved permanently: '+doc.no);
+  }catch(e){
+    console.error(e);
+    toast(e&&e.code==='permission-denied'?'Not allowed for your login. Ask the owner.':'Could not save. Check internet and tap Confirm again.');
+  }finally{setSaving(false);}
+}
+$('pvPrint').onclick=()=>confirmSave(true);
+$('pvSave').onclick=()=>confirmSave(false);
+$('lsWa').onclick=()=>{const c=db.challans.find(x=>x.id===lastId);if(c)waOpen(clientPhone(c.client,c.phone),challanText(c));};
+$('lsPrint').onclick=()=>{const c=db.challans.find(x=>x.id===lastId);if(c)printChallan(c);};
+
+/* ---------- print ---------- */
+function coHead(co,title,right){
+  return `<div class="hd"><div><h1>${esc(co.name)}</h1><div>${esc(co.addr)}</div>
+    <div>${co.phone?'Ph: '+esc(co.phone):''}${co.email?' &nbsp; '+esc(co.email):''}</div>${co.gst?`<div>GSTIN: ${esc(co.gst)}</div>`:''}</div>
+    <div class="ttl"><b>${title}</b>${right}</div></div>`;
+}
+function challanHTML(c,copyLabel,compact){
+  const co=c.co||coById(c.companyId);const later=laterPaid(c);
+  const rows=c.items.map((it,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${esc(it.name)}</td><td style="text-align:right">${it.qty}</td><td style="text-align:right">${num(it.price)}</td><td style="text-align:right">${num(it.qty*it.price)}</td></tr>`).join('');
+  const blanks=Array(Math.max(0,(compact?5:8)-c.items.length)).fill('<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>').join('');
+  const who=c.dName?`${c.dMode==='Take Away'?'Picked up by':'Delivered by'}: ${esc(c.dName)}<br>Mobile: ${esc(c.dMobile)}`:'';
+  return `<div class="pc${compact?' cmp':''}">${copyLabel?`<div class="copy">${copyLabel}</div>`:''}
+  ${coHead(co,'DELIVERY CHALLAN',`No: <strong>${esc(c.no)}</strong><br>Date: ${fmtDate(c.date)}`)}
+  <div class="meta"><div><strong>To:</strong> ${esc(c.client)}<br>${esc(c.addr)}${c.phone?'<br>Ph: '+esc(c.phone):''}</div>
+    <div><strong>Delivery:</strong> ${esc(c.dMode||'')}${who?'<br>'+who:''}${c.dVeh?'<br>Vehicle no: '+esc(c.dVeh):''}${c.note?'<br><strong>Remarks:</strong> '+esc(c.note):''}</div></div>
+  <table><thead><tr><th style="width:9%">Sr. No.</th><th>Product name</th><th style="width:10%;text-align:right">Qty</th><th style="width:15%;text-align:right">Price ₹</th><th style="width:17%;text-align:right">Amount ₹</th></tr></thead>
+  <tbody>${rows}${blanks}<tr><td colspan="4" style="text-align:right"><strong>Total amount payable</strong></td><td style="text-align:right"><strong>${num(c.total)}</strong></td></tr></tbody></table>
+  <div class="pay"><div><table>
+    <tr><td>Received at delivery</td><td style="text-align:right"><strong>₹ ${num(c.paid)}</strong></td></tr>
+    ${later>0?`<tr><td>Received later</td><td style="text-align:right"><strong>₹ ${num(later)}</strong></td></tr>`:''}
+    <tr><td>Remaining balance</td><td style="text-align:right"><strong>₹ ${num(dueOf(c))}</strong></td></tr></table></div>
+    <div><table><tr><td>Mode of payment</td><td><strong>${esc(c.mode)}</strong></td></tr>
+    ${c.ref?`<tr><td>${c.mode==='Cheque'?'Cheque no.':'Txn ID'}</td><td>${esc(c.ref)}</td></tr>`:''}
+    <tr><td>Received by</td><td><strong>${esc(c.recv)}</strong></td></tr></table></div></div>
+  <div class="sig"><div>Receiver's signature</div><div>For ${esc(co.name)}</div></div></div>`;
+}
+function doPrint(html){$('printArea').innerHTML=html;setTimeout(()=>window.print(),120);}
+const ONE_PAGE_MAX=10;
+function printChallan(c){
+  if(db.copies!=='2')return doPrint(challanHTML(c,''));
+  if(c.items.length>ONE_PAGE_MAX){toast('More than '+ONE_PAGE_MAX+' items, so the two copies print on separate pages');return doPrint(challanHTML(c,'ORIGINAL')+challanHTML(c,'DUPLICATE'));}
+  doPrint(`<div class="half">${challanHTML(c,'ORIGINAL',true)}</div><div class="cut"><span>✂ CUT HERE</span></div><div class="half">${challanHTML(c,'DUPLICATE',true)}</div>`);
+}
+function printReceipt(p){
+  const co=coById(p.companyId);const ch=db.challans.find(c=>c.id===p.challanId);const bal=clientTotals(p.client,p.companyId).bal;
+  doPrint(`<div class="pc">${coHead(co,'PAYMENT RECEIPT',`Date: ${fmtDate(p.date)}`)}
+  <table><tbody><tr><td style="width:35%">Received from</td><td><strong>${esc(p.client)}</strong></td></tr>
+  <tr><td>Amount</td><td><strong>₹ ${num(p.amount)}</strong></td></tr>
+  <tr><td>Mode of payment</td><td>${esc(p.mode)}${p.ref?' ('+esc(p.ref)+')':''}</td></tr>
+  <tr><td>Against</td><td>${ch?'Challan '+esc(ch.no):'On account'}</td></tr>
+  <tr><td>Received by</td><td>${esc(p.recv)}</td></tr>
+  <tr><td>Balance after this payment</td><td><strong>₹ ${num(bal)}</strong></td></tr></tbody></table>
+  <div class="sig"><div>Payer's signature</div><div>For ${esc(co.name)}</div></div></div>`);
+}
+
+/* ---------- challans list ---------- */
+function renderHist(){
+  const q=key($('hSearch').value),cid=$('hCompany').value;
+  const list=db.challans.filter(c=>(!cid||c.companyId===+cid)&&(!q||key(c.client).includes(q)||key(c.no).includes(q)));
+  $('histRows').innerHTML=list.length?list.map(c=>{const d=dueOf(c);return `<tr><td class="cno">${esc(c.no)}</td><td>${fmtDate(c.date)}${c.byName?'<br><span class="hint">by '+esc(c.byName)+'</span>':''}</td><td>${esc(c.client)}</td>
+    <td class="n money">${inr(c.total)}</td><td class="n"><span class="pill ${d>0?'due':'clear'}">${d>0?inr(d):'Paid'}</span></td>
+    <td>${esc(c.dMode||'')}${c.dName?'<br><span class="hint">'+esc(c.dName)+' · '+esc(c.dMobile)+'</span>':''}</td>
+    <td><div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-w="${c.id}">WhatsApp</button><button class="btn sm" data-p="${c.id}">Reprint</button>${d>0?`<button class="btn ghost sm" data-y="${c.id}">Payment</button>`:''}</div></td></tr>`}).join('')
+    :'<tr><td colspan="7" class="hint">No challans yet. Saved challans appear here, locked.</td></tr>';
+}
+$('hSearch').oninput=renderHist;$('hCompany').onchange=renderHist;
+function challanActions(e){
+  const b=e.target.closest('button');if(!b)return;
+  const c=db.challans.find(x=>x.id===+(b.dataset.w||b.dataset.p||b.dataset.y));if(!c)return;
+  if(b.dataset.w)waOpen(clientPhone(c.client,c.phone),challanText(c));
+  if(b.dataset.p)printChallan(c);
+  if(b.dataset.y)startPayment(c.client,c);
+}
+$('histRows').onclick=challanActions;
+
+/* ---------- payments ---------- */
+function startPayment(client,ch){
+  go('pay');$('yClient').value=client;
+  if(ch)$('yCompany').value=ch.companyId;
+  fillPayChallans(ch?ch.id:null);
+  $('yAmt').focus();
+}
+function fillPayChallans(selId){
+  const n=$('yClient').value.trim(),cid=+$('yCompany').value;
+  const pend=db.challans.filter(c=>key(c.client)===key(n)&&c.companyId===cid&&dueOf(c)>0).sort((a,b)=>a.id-b.id);
+  $('yChallan').innerHTML='<option value="">On account (no specific challan)</option>'+pend.map(c=>`<option value="${c.id}">${esc(c.no)} · ${fmtDate(c.date)} · due ${inr(dueOf(c))}</option>`).join('');
+  if(selId)$('yChallan').value=selId;else if(pend.length)$('yChallan').value=pend[0].id;
+  setPayAmt();
+  if(n){const t=clientTotals(n,cid);$('yBal').innerHTML=`Current balance of ${esc(n)}: <strong style="color:var(--warn)">${inr(t.bal)}</strong>`;}else $('yBal').textContent='';
+}
+function setPayAmt(){const c=db.challans.find(x=>x.id===+$('yChallan').value);$('yAmt').value=c?dueOf(c):'';}
+$('yClient').addEventListener('change',()=>fillPayChallans());$('yCompany').onchange=()=>fillPayChallans();$('yChallan').onchange=setPayAmt;
+$('yMode').onchange=()=>refUI('yMode','yRefBox','yRefLbl');
+$('btnSavePay').onclick=()=>{
+  const n=$('yClient').value.trim(),amt=r2($('yAmt').value);
+  if(!n)return toast('Pick the client');
+  if(!findClient(n)&&!db.challans.some(c=>key(c.client)===key(n)))return toast('This client is not in your list. Add them in Clients first');
+  if(!(amt>0))return toast('Enter the amount received');
+  if(!confirmTap($('btnSavePay')))return;
+  const p={id:Date.now(),date:$('yDate').value||today(),client:(findClient(n)||{name:n}).name,companyId:+$('yCompany').value,
+    challanId:+$('yChallan').value||null,amount:amt,mode:$('yMode').value,ref:$('yMode').value==='Cash'?'':$('yRef').value.trim(),recv:$('yRecv').value.trim(),locked:true,
+    by:me.uid,byName:myName,savedAt:Date.now()};
+  write(fs.collection('payments').doc(String(p.id)).set(p));
+  ['yAmt','yRef'].forEach(i=>$(i).value='');
+  toast('Payment of '+inr(amt)+' saved'+(navigator.onLine?'':'. It will upload when internet is back'));
+};
+function renderPays(){
+  $('payRows').innerHTML=db.payments.length?db.payments.map(p=>{const ch=db.challans.find(c=>c.id===p.challanId);
+    return `<tr><td>${fmtDate(p.date)}</td><td>${esc(p.client)}</td><td class="cno">${ch?esc(ch.no):'On account'}</td><td class="n money">${inr(p.amount)}</td>
+    <td>${esc(p.mode)}${p.ref?'<br><span class="hint">'+esc(p.ref)+'</span>':''}</td><td>${esc(p.recv)}${p.byName&&p.byName!==p.recv?'<br><span class="hint">entered by '+esc(p.byName)+'</span>':''}</td>
+    <td><div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-pw="${p.id}">WhatsApp</button><button class="btn ghost sm" data-pp="${p.id}">Receipt</button></div></td></tr>`}).join('')
+    :'<tr><td colspan="7" class="hint">No later payments yet. When a client pays a pending balance, record it above.</td></tr>';
+}
+function payActions(e){
+  const b=e.target.closest('button');if(!b)return;
+  const p=db.payments.find(x=>x.id===+(b.dataset.pw||b.dataset.pp));if(!p)return;
+  if(b.dataset.pw)waOpen(clientPhone(p.client),paymentText(p));
+  if(b.dataset.pp)printReceipt(p);
+}
+$('payRows').onclick=payActions;
+
+/* ---------- clients ---------- */
+function allClientNames(){
+  const m=new Map();db.clients.forEach(c=>m.set(key(c.name),c.name));db.challans.forEach(c=>{if(!m.has(key(c.client)))m.set(key(c.client),c.client);});
+  return [...m.values()].sort((a,b)=>a.localeCompare(b));
+}
+function renderCli(){
+  const q=key($('cSearch').value);
+  const names=allClientNames();
+  let P=0,Y=0,B=0;
+  const rows=names.map(n=>{const t=clientTotals(n);P+=t.purchases;Y+=t.paid;B+=t.bal;return {n,t};}).filter(r=>!q||key(r.n).includes(q));
+  $('cliSum').innerHTML=`<div class="tot"><span>Clients</span><b>${names.length}</b></div><div class="tot"><span>Total sales</span><b>${inr(P)}</b></div>
+    <div class="tot paid"><span>Total received</span><b>${inr(Y)}</b></div><div class="tot due"><span>Total outstanding</span><b>${inr(B)}</b></div>`;
+  $('cliRows').innerHTML=rows.length?rows.map(({n,t})=>`<tr class="click" data-c="${esc(n)}"><td><strong>${esc(n)}</strong></td><td>${esc(findClient(n)?.phone||'')}</td>
+    <td class="n money">${inr(t.purchases)}</td><td class="n money">${inr(t.paid)}</td><td class="n"><span class="pill ${t.bal>0?'due':'clear'}">${t.bal>0?inr(t.bal):'Nil'}</span></td>
+    <td><button class="btn ghost sm">View</button></td></tr>`).join('')
+    :'<tr><td colspan="6" class="hint">No clients yet. Clients are added automatically when you save a challan.</td></tr>';
+}
+$('cSearch').oninput=renderCli;
+$('cliRows').onclick=e=>{const tr=e.target.closest('tr[data-c]');if(tr)openLedger(tr.dataset.c);};
+$('btnAddCli').onclick=()=>{const n=$('ncName').value.trim();if(!n)return toast('Enter client name');
+  if(findClient(n))return toast('This client is already in the list');
+  write(fs.collection('clients').add({name:n,phone:$('ncPhone').value.trim(),addr:$('ncAddr').value.trim()}));
+  ['ncName','ncPhone','ncAddr'].forEach(i=>$(i).value='');toast('Client added');};
+
+let ledName=null;
+function openLedger(n){
+  ledName=n;const c=findClient(n)||{name:n,phone:'',addr:''};
+  $('cliList').hidden=true;$('cliLedger').hidden=false;
+  $('lgName').textContent=c.name;$('lgPhone').value=c.phone||'';$('lgAddr').value=c.addr||'';
+  renderLedger();window.scrollTo(0,0);
+}
+function ledgerRows(n,cid){
+  const t=clientTotals(n,cid);const rows=[];
+  t.ch.forEach(c=>{rows.push({date:c.date,ord:c.id,type:'ch',c,dr:c.total,cr:0});
+    if(c.paid>0)rows.push({date:c.date,ord:c.id+0.5,type:'adv',c,dr:0,cr:c.paid});});
+  t.py.forEach(p=>rows.push({date:p.date,ord:p.id,type:'pay',p,dr:0,cr:p.amount}));
+  rows.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.ord-b.ord);
+  let bal=0;rows.forEach(r=>{bal=r2(bal+r.dr-r.cr);r.bal=bal;});
+  return {t,rows};
+}
+function rowDetail(r,plain){
+  const multi=activeCos().length>1&&!$('lgCompany').value;
+  if(r.type==='ch'){const co=r.c.co||coById(r.c.companyId);
+    return `Challan <span class="cno">${esc(r.c.no)}</span>${multi?' · '+esc(co.name):''}`+(plain?'':`<br><span class="hint">${r.c.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</span>`);}
+  if(r.type==='adv')return `Paid at delivery · ${esc(r.c.mode)}${r.c.ref?' ('+esc(r.c.ref)+')':''}${r.c.recv?' · recd. by '+esc(r.c.recv):''}`;
+  const ch=db.challans.find(c=>c.id===r.p.challanId);
+  return `Payment · ${esc(r.p.mode)}${r.p.ref?' ('+esc(r.p.ref)+')':''} · ${ch?'for '+esc(ch.no):'on account'}${r.p.recv?' · recd. by '+esc(r.p.recv):''}`;
+}
+function renderLedger(){
+  if(!ledName)return;
+  const {t,rows}=ledgerRows(ledName,$('lgCompany').value);
+  $('lgSum').innerHTML=`<div class="tot"><span>Total purchases</span><b>${inr(t.purchases)}</b></div><div class="tot paid"><span>Total paid</span><b>${inr(t.paid)}</b></div>
+    <div class="tot due"><span>Balance due</span><b>${inr(t.bal)}</b></div><div class="tot"><span>Challans</span><b>${t.ch.length}</b></div>`;
+  $('lgRows').innerHTML=rows.length?rows.map(r=>`<tr class="${r.type==='ch'?'lg-ch':''}"><td>${fmtDate(r.date)}</td><td>${rowDetail(r)}</td>
+    <td class="n money">${r.dr?num(r.dr):''}</td><td class="n money" style="color:var(--ok)">${r.cr?num(r.cr):''}</td><td class="n money">${num(r.bal)}</td>
+    <td>${r.type==='ch'?`<div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-w="${r.c.id}">WhatsApp</button><button class="btn ghost sm" data-p="${r.c.id}">Print</button></div>`
+      :r.type==='pay'?`<div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-pw="${r.p.id}">WhatsApp</button><button class="btn ghost sm" data-pp="${r.p.id}">Receipt</button></div>`:''}</td></tr>`).join('')
+    :'<tr><td colspan="6" class="hint">No challans or payments for this client yet.</td></tr>';
+}
+$('lgRows').onclick=e=>{const b=e.target.closest('button');if(!b)return;(b.dataset.pw||b.dataset.pp)?payActions(e):challanActions(e);};
+$('lgCompany').onchange=renderLedger;
+$('lgBack').onclick=()=>{ledName=null;$('cliLedger').hidden=true;$('cliList').hidden=false;renderCli();};
+$('lgPhone').onchange=$('lgAddr').onchange=()=>{
+  const c=findClient(ledName);const data={phone:$('lgPhone').value.trim(),addr:$('lgAddr').value.trim()};
+  write(c?fs.collection('clients').doc(c._id).update(data):fs.collection('clients').add({name:ledName,...data}));
+  toast('Client details saved');
+};
+$('lgPay').onclick=()=>{const cid=$('lgCompany').value;startPayment(ledName,null);if(cid){$('yCompany').value=cid;fillPayChallans();}};
+$('lgWa').onclick=()=>{
+  const cid=$('lgCompany').value;const {t}=ledgerRows(ledName,cid);const co=coById(cid||$('cCompany').value);
+  const pend=t.ch.filter(c=>dueOf(c)>0);
+  let s=`*${co.name}*\nAccount statement for ${ledName}\nDate: ${fmtDate(today())}\n\nTotal purchases: ₹${num(t.purchases)}\nTotal paid: ₹${num(t.paid)}\n*Balance due: ₹${num(t.bal)}*`;
+  if(pend.length)s+='\n\nPending challans:\n'+pend.map(c=>`• ${c.no} (${fmtDate(c.date)}) - ₹${num(dueOf(c))}`).join('\n');
+  s+=`\n\nThank you,\n${co.name}${co.phone?'\n'+co.phone:''}`;
+  waOpen(clientPhone(ledName),s);
+};
+$('lgPrint').onclick=()=>{
+  const cid=$('lgCompany').value;const {t,rows}=ledgerRows(ledName,cid);const co=coById(cid||$('cCompany').value);const c=findClient(ledName)||{};
+  doPrint(`<div class="pc">${coHead(co,'ACCOUNT STATEMENT',`Date: ${fmtDate(today())}`)}
+  <div class="meta"><div><strong>Client:</strong> ${esc(ledName)}<br>${esc(c.addr||'')}${c.phone?'<br>Ph: '+esc(c.phone):''}</div>
+  <div>Total purchases: <strong>₹ ${num(t.purchases)}</strong><br>Total paid: <strong>₹ ${num(t.paid)}</strong><br>Balance due: <strong>₹ ${num(t.bal)}</strong></div></div>
+  <table><thead><tr><th style="width:13%">Date</th><th>Details</th><th style="width:15%;text-align:right">Purchase ₹</th><th style="width:15%;text-align:right">Paid ₹</th><th style="width:15%;text-align:right">Balance ₹</th></tr></thead>
+  <tbody>${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${rowDetail(r,true).replace(/<[^>]+>/g,'')}</td><td style="text-align:right">${r.dr?num(r.dr):''}</td><td style="text-align:right">${r.cr?num(r.cr):''}</td><td style="text-align:right">${num(r.bal)}</td></tr>`).join('')}</tbody></table>
+  <div class="sig"><div>Client's signature</div><div>For ${esc(co.name)}</div></div></div>`);
+};
+
+/* ---------- products (staff can add; only the owner can change or delete) ---------- */
+function renderProd(){
+  const ro=isAdmin?'':' readonly';
+  $('prodRows').innerHTML=db.products.map(p=>`<tr><td><input value="${esc(p.name)}" data-id="${p._id}" data-f="name"${ro}></td><td style="width:110px"><input value="${esc(p.unit)}" data-id="${p._id}" data-f="unit"${ro}></td>
+   <td class="n" style="width:130px"><input type="number" value="${p.price}" data-id="${p._id}" data-f="price" style="text-align:right"${ro}></td><td style="width:50px">${isAdmin?`<button class="btn danger sm" data-del="${p._id}" aria-label="Delete product">✕</button>`:''}</td></tr>`).join('')||'<tr><td colspan="4" class="hint">No products yet.</td></tr>';
+}
+$('prodRows').onchange=e=>{const t=e.target;if(t.dataset.f&&isAdmin){write(fs.collection('products').doc(t.dataset.id).update({[t.dataset.f]:t.dataset.f==='price'?+t.value:t.value}));toast('Product updated');}};
+$('prodRows').onclick=e=>{const b=e.target.closest('[data-del]');if(b&&isAdmin)write(fs.collection('products').doc(b.dataset.del).delete());};
+$('btnAddProd').onclick=()=>{const n=$('npName').value.trim();if(!n)return toast('Enter product name');
+  if(db.products.some(p=>key(p.name)===key(n)))return toast('This product is already in the list');
+  write(fs.collection('products').add({name:n,unit:$('npUnit').value.trim()||'Nos',price:+$('npPrice').value||0}));
+  ['npName','npUnit','npPrice'].forEach(i=>$(i).value='');toast('Product added');};
+
+/* ---------- settings ---------- */
+const coFields=[['name','Company name'],['phone','Phone'],['email','Email'],['gst','GSTIN'],['addr','Address'],['prefix','Challan no. prefix']];
+function loadSet(){
+  $('acctInfo').textContent=me?`Signed in as ${me.email}${isAdmin?' (owner)':' (staff)'}.`:'';
+  $('myNameIn').value=myName;
+  if(!isAdmin)return;
+  $('coCards').innerHTML=db.companies.map((co,i)=>`<div class="card"><h2>Company ${i+1}${i===0?'':' <span class="hint" style="font-weight:400">(leave name blank if not used)</span>'}</h2><div class="grid">
+    ${coFields.map(([f,l])=>`<div${f==='addr'?' style="grid-column:1/-1"':''}><label for="co${co.id}_${f}">${l}</label><input id="co${co.id}_${f}" value="${esc(co[f])}"></div>`).join('')}
+    </div><p class="hint" style="margin:10px 0 0">Next challan: <span class="cno">${esc(fmtNo(co,nextSeq(co.id)))}</span></p></div>`).join('');
+  $('sCopies').value=db.copies;
+  pwUI();
+}
+$('btnMyName').onclick=()=>{const n=$('myNameIn').value.trim();if(!n)return toast('Enter your name');myName=n;$('who').textContent=n;
+  write(fs.collection('users').doc(me.uid).set({name:n,email:me.email},{merge:true}));toast('Name saved');};
+const settingsRef=()=>fs.collection('settings').doc('main');
+$('btnSaveSet').onclick=()=>{
+  const cos=db.companies.map(co=>{const o={...co};coFields.forEach(([f])=>{o[f]=$(`co${co.id}_${f}`).value.trim();});return o;});
+  if(!cos[0].name)cos[0].name='PREMIER POOLS';
+  cos.forEach((co,i)=>{if(!co.prefix)co.prefix=['PP/DC/','B/DC/','C/DC/'][i];});
+  write(settingsRef().set({companies:cos,copies:$('sCopies').value},{merge:true}));toast('Settings saved');
+};
+function backupData(){return {exportedAt:new Date().toISOString(),companies:db.companies,copies:db.copies,
+  products:db.products.map(strip),clients:db.clients.map(strip),challans:db.challans.map(strip),payments:db.payments.map(strip)};}
+$('btnExport').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(backupData(),null,1)],{type:'application/json'}));
+  a.download='premier-pools-backup-'+today()+'.json';a.click();toast('Backup downloaded');};
+
+/* old single-phone backups use another shape; bring them to this one */
+function migrate(d){
+  d.products=d.products||[];d.clients=d.clients||[];d.challans=d.challans||[];d.payments=d.payments||[];
+  if(!d.companies&&d.settings){const s=d.settings;d.companies=defaultCos();Object.assign(d.companies[0],{name:s.name||'PREMIER POOLS',addr:s.addr||'',phone:s.phone||'',email:s.email||d.companies[0].email,gst:s.gst||'',prefix:s.prefix||'PP/DC/'});d.copies=s.copies||'2';}
+  d.challans.forEach(c=>{if(!c.companyId)c.companyId=1;if(!c.seq){const m=String(c.no).match(/(\d+)\s*$/);c.seq=m?+m[1]:0;}c.paid=+c.paid||0;});
+  return d;
+}
+/* writes in chunks so big imports and deletes stay under the database's batch limit */
+async function runOps(ops){for(let i=0;i<ops.length;i+=400){const b=fs.batch();ops.slice(i,i+400).forEach(f=>f(b));await b.commit();}}
+async function importData(d,label){
+  const chIds=new Set(db.challans.map(c=>c._id)),pIds=new Set(db.payments.map(p=>p._id));
+  const cl=new Set(db.clients.map(c=>key(c.name))),pr=new Set(db.products.map(p=>key(p.name)));
+  const ops=[];let skipped=0,added=0;
+  d.challans.forEach(c=>{const id=c.companyId+'_'+c.seq;if(chIds.has(id)){skipped++;return;}chIds.add(id);added++;
+    const doc={...strip(c),by:c.by||me.uid,byName:c.byName||myName};ops.push(b=>b.set(fs.collection('challans').doc(id),doc));});
+  d.payments.forEach(p=>{const id=String(p.id);if(pIds.has(id))return;pIds.add(id);
+    const doc={...strip(p),by:p.by||me.uid,byName:p.byName||myName};ops.push(b=>b.set(fs.collection('payments').doc(id),doc));});
+  d.clients.forEach(c=>{if(cl.has(key(c.name)))return;cl.add(key(c.name));ops.push(b=>b.set(fs.collection('clients').doc(),strip(c)));});
+  d.products.forEach(p=>{if(pr.has(key(p.name)))return;pr.add(key(p.name));ops.push(b=>b.set(fs.collection('products').doc(),strip(p)));});
+  await runOps(ops);
+  return {added,skipped};
+}
+$('fImport').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();r.onload=async()=>{
+  let d;try{d=migrate(JSON.parse(r.result));if(!Array.isArray(d.challans))throw 0;}catch(x){return toast('That file is not a Premier Pools backup');}
+  if(!navigator.onLine)return toast('Connect to the internet to restore a backup');
+  toast('Restoring backup…');
+  try{
+    if(d.companies&&!db.challans.length)await settingsRef().set({companies:d.companies,copies:d.copies||'2'},{merge:true});
+    const res=await importData(d);
+    toast(`Backup restored: ${res.added} challans added`+(res.skipped?`, ${res.skipped} already existed`:''));
+  }catch(x){fail(x);}
+};r.readAsText(f);};
+
+/* ---------- delete password, wipe & undo (owner only) ---------- */
+function hashPw(s){let h1=0x811c9dc5,h2=0x1505;const t='pp#'+s;for(let i=0;i<t.length;i++){const c=t.charCodeAt(i);h1=Math.imul(h1^c,16777619)>>>0;h2=(Math.imul(h2,33)+c)>>>0;}return h1.toString(16)+h2.toString(16);}
+function pwUI(){
+  if(!isAdmin)return;
+  const has=!!db.delPass;
+  $('pwState').textContent=has?'A delete password is set. It is needed to delete all data.':'No password set yet. Set one now. Deleting all data is blocked until you do.';
+  $('pwOldBox').hidden=!has;$('btnPw').textContent=has?'Change password':'Set password';
+  const tr=db.trash;$('trashBox').hidden=!tr.length;
+  if(tr.length){const n=c=>tr.filter(t=>t.col===c).length;
+    $('trashInfo').textContent=`Deleted on ${new Date(Math.max(...tr.map(t=>t.at))).toLocaleString('en-IN')}: ${n('challans')} challans, ${n('payments')} payments, ${n('clients')} clients, ${n('products')} products.`;}
+}
+$('btnPw').onclick=()=>{
+  if(db.delPass&&hashPw($('pwOld').value)!==db.delPass)return toast('Current password is wrong');
+  const n=$('pwNew').value;
+  if(n.length<4)return toast('Password must be at least 4 characters');
+  if(n!==$('pwNew2').value)return toast('The two new passwords do not match');
+  write(settingsRef().set({delPass:hashPw(n)},{merge:true}));['pwOld','pwNew','pwNew2'].forEach(i=>$(i).value='');toast('Password saved');
+};
+let busy=false;
+$('btnWipe').onclick=async()=>{
+  if(busy)return;
+  if(!db.delPass)return toast('Set a delete password first');
+  if(hashPw($('wPass').value)!==db.delPass)return toast('Wrong password. Nothing was deleted');
+  if($('wWord').value.trim().toUpperCase()!=='DELETE')return toast('Type DELETE in the box to confirm');
+  const cols=['challans','payments','clients','products'];
+  if(!cols.some(c=>db[c].length))return toast('There is no data to delete');
+  if(!navigator.onLine)return toast('Connect to the internet to delete');
+  busy=true;toast('Deleting…');
+  try{
+    const at=Date.now(),ops=[];
+    db.trash.forEach(t=>ops.push(b=>b.delete(fs.collection('trash').doc(t._id))));
+    cols.forEach(col=>db[col].forEach(d=>{
+      ops.push(b=>b.set(fs.collection('trash').doc(col+'__'+d._id),{col,id:d._id,data:strip(d),at}));
+      ops.push(b=>b.delete(fs.collection(col).doc(d._id)));
+    }));
+    [1,2,3].forEach(id=>ops.push(b=>b.delete(fs.collection('counters').doc(String(id)))));
+    await runOps(ops);
+    $('wPass').value='';$('wWord').value='';$('lastSaved').hidden=true;
+    toast('All data deleted. You can still restore it from Settings.');
+  }catch(e){fail(e);}finally{busy=false;}
+};
+$('btnUndo').onclick=async()=>{
+  if(busy||!db.trash.length)return;
+  if(!navigator.onLine)return toast('Connect to the internet to restore');
+  busy=true;
+  try{
+    const live={challans:new Set(db.challans.map(c=>c._id)),payments:new Set(db.payments.map(p=>p._id))};
+    const names={clients:new Set(db.clients.map(c=>key(c.name))),products:new Set(db.products.map(p=>key(p.name)))};
+    const ops=[];let clash=0;
+    db.trash.forEach(t=>{
+      if(live[t.col]&&live[t.col].has(t.id)){clash++;return;}
+      if(names[t.col]&&names[t.col].has(key(t.data.name))){ops.push(b=>b.delete(fs.collection('trash').doc(t._id)));return;}
+      ops.push(b=>b.set(fs.collection(t.col).doc(t.id),t.data));
+      ops.push(b=>b.delete(fs.collection('trash').doc(t._id)));
+    });
+    await runOps(ops);
+    toast(clash?`Restored. ${clash} old challan/payment numbers were already reused, so those stay in the deleted list.`:'Deleted data restored');
+  }catch(e){fail(e);}finally{busy=false;}
+};
+
+/* ---------- live sync ---------- */
+function onData(col){
+  refreshLists();
+  if($('pv').hidden)showNo();
+  showClientBal();
+  if(curTab==='hist')renderHist();
+  if(curTab==='pay')renderPays();
+  if(curTab==='cli'){$('cliLedger').hidden?renderCli():renderLedger();}
+  if(curTab==='prod'&&!$('prodRows').contains(document.activeElement))renderProd();
+  if(curTab==='set'&&col==='trash')pwUI();
+  if(curTab==='set'&&col==='settings'&&!$('set').contains(document.activeElement))loadSet();
+}
+function listenErr(e){console.error(e);if(e.code==='permission-denied')toast('Your login does not have access. Ask the owner.');}
+function listen(){
+  subs.push(settingsRef().onSnapshot(d=>{const v=d.exists?d.data():{};
+    if(Array.isArray(v.companies)&&v.companies.length)db.companies=v.companies;db.copies=v.copies||'2';db.delPass=v.delPass||'';onData('settings');},listenErr));
+  const order={challans:(a,b)=>(b.savedAt||b.id)-(a.savedAt||a.id),payments:(a,b)=>b.id-a.id,clients:(a,b)=>a.name.localeCompare(b.name),products:(a,b)=>a.name.localeCompare(b.name)};
+  Object.keys(order).forEach(col=>subs.push(fs.collection(col).onSnapshot(s=>{
+    db[col]=s.docs.map(d=>({...d.data(),_id:d.id})).sort(order[col]);onData(col);},listenErr)));
+  if(isAdmin)subs.push(fs.collection('trash').onSnapshot(s=>{db.trash=s.docs.map(d=>({...d.data(),_id:d.id}));onData('trash');},listenErr));
+}
+function stopListening(){subs.forEach(u=>u());subs=[];db={...db,products:[],clients:[],challans:[],payments:[],trash:[]};}
+
+/* ---------- sign in ---------- */
+function gate(view){['gLoad','gLogin','gName','gSetup'].forEach(id=>$(id).hidden=id!==view);$('gate').hidden=!view;}
+const authMsg=c=>({'auth/invalid-email':'That email address is not valid.','auth/user-disabled':'This login has been switched off by the owner.',
+  'auth/user-not-found':'Wrong email or password.','auth/wrong-password':'Wrong email or password.','auth/invalid-credential':'Wrong email or password.','auth/invalid-login-credentials':'Wrong email or password.',
+  'auth/too-many-requests':'Too many tries. Wait a few minutes and try again.','auth/network-request-failed':'No internet. Connect and try again.'}[c]||'Could not sign in. Try again.');
+$('gLogin').onsubmit=async e=>{
+  e.preventDefault();$('gErr').textContent='';
+  const em=$('gEmail').value.trim(),pw=$('gPass').value;
+  if(!em||!pw)return $('gErr').textContent='Enter your email and password.';
+  $('gBtn').disabled=true;$('gBtn').textContent='Signing in…';
+  try{await auth.signInWithEmailAndPassword(em,pw);$('gPass').value='';}
+  catch(x){$('gErr').textContent=authMsg(x.code);}
+  finally{$('gBtn').disabled=false;$('gBtn').textContent='Sign in';}
+};
+$('gForgot').onclick=async()=>{
+  const em=$('gEmail').value.trim();
+  if(!em)return $('gErr').textContent='Type your email above first, then tap Forgot password.';
+  try{await auth.sendPasswordResetEmail(em);$('gErr').textContent='A password reset link has been sent to '+em+'.';}
+  catch(x){$('gErr').textContent=authMsg(x.code);}
+};
+$('gName').onsubmit=e=>{
+  e.preventDefault();const n=$('gNameIn').value.trim();if(!n)return;
+  myName=n;$('who').textContent=n;LS.set('pp_name_'+me.uid,n);
+  write(fs.collection('users').doc(me.uid).set({name:n,email:me.email},{merge:true}));
+  gate(null);
+};
+$('btnOut').onclick=()=>{if(confirmTap($('btnOut')))auth.signOut();};
+async function startSession(u){
+  me=u;isAdmin=ADMINS.includes(key(u.email));
+  document.body.classList.toggle('staff',!isAdmin);
+  myName=LS.get('pp_name_'+u.uid,'');
+  $('who').textContent=myName||u.email;
+  listen();gate(null);resetForm();
+  try{const d=await fs.collection('users').doc(u.uid).get();if(d.exists&&d.data().name){myName=d.data().name;LS.set('pp_name_'+u.uid,myName);$('who').textContent=myName;}}catch(e){}
+  if(!myName){$('gNameIn').value='';gate('gName');}
+}
+
+/* ---------- start ---------- */
+function netUI(){$('net').hidden=navigator.onLine;}
+window.addEventListener('online',netUI);window.addEventListener('offline',netUI);netUI();
+$('yDate').value=today();refUI('yMode','yRefBox','yRefLbl');
+refreshLists();resetForm();
+const configured=CFG.firebase&&CFG.firebase.apiKey&&!/PASTE/i.test(CFG.firebase.apiKey)&&window.firebase;
+if(!configured)gate('gSetup');
+else{
+  firebase.initializeApp(CFG.firebase);
+  auth=firebase.auth();fs=firebase.firestore();
+  fs.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+  auth.onAuthStateChanged(u=>{if(u)startSession(u);else{me=null;stopListening();gate('gLogin');}});
+}
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
