@@ -12,5 +12,5 @@ window.PP_CONFIG = {
     messagingSenderId: "106120598672",
     appId: "1:106120598672:web:0e68615100b78e8aa0b415"
   },
-  adminEmails: ["premierpools2016@gmail.com"]
+  adminEmails: ["premierpools2016@gmail.com", "jatin776@gmail.com", "bhavesh.rasania@gmail.com", "javid1612patel@gmail.com"]
 };
