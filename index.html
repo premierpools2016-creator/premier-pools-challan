@@ -150,6 +150,7 @@ main .tbl table{min-width:600px}
   <button data-tab="pay">Payments</button>
   <button data-tab="cli">Clients</button>
   <button data-tab="prod">Products</button>
+  <button data-tab="rep">Reports</button>
   <button data-tab="set">Settings</button>
 </nav>
 
@@ -331,6 +332,37 @@ main .tbl table{min-width:600px}
   </div>
 </section>
 
+<!-- REPORTS -->
+<section id="rep">
+  <div class="card">
+    <h2>Reports</h2>
+    <div class="grid">
+      <div><label for="rType">Report</label>
+        <select id="rType">
+          <option value="clients">All clients (purchases, paid, balance)</option>
+          <option value="challans">Challan list</option>
+          <option value="pending">Remaining payment list</option>
+          <option value="ledger">Client ledger</option>
+        </select></div>
+      <div id="rCliBox"><label for="rClient">Client</label><select id="rClient"></select></div>
+      <div><label for="rCompany">Company</label><select id="rCompany"></select></div>
+      <div id="rFromBox"><label for="rFrom">From date</label><input type="date" id="rFrom"></div>
+      <div id="rToBox"><label for="rTo">To date</label><input type="date" id="rTo"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="rXls">Download Excel</button>
+      <button class="btn ghost" id="rPdf">Download PDF</button>
+      <button class="btn ghost" id="rPrint">Print</button>
+    </div>
+    <p class="hint" id="rHint" style="margin-bottom:0"></p>
+  </div>
+  <div class="card">
+    <h2 id="rTitle" style="margin-bottom:4px"></h2>
+    <p class="hint" id="rSub" style="margin-top:0"></p>
+    <div class="tbl"><table id="rTable"></table></div>
+  </div>
+</section>
+
 <!-- SETTINGS -->
 <section id="set">
   <div class="card">
@@ -500,7 +532,7 @@ function go(tab){
   curTab=tab;
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.tab===tab));
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===tab));
-  ({hist:renderHist,pay:()=>{fillPayChallans();renderPays();},cli:()=>{$('cliLedger').hidden?renderCli():renderLedger();},prod:renderProd,set:loadSet})[tab]?.();
+  ({hist:renderHist,pay:()=>{fillPayChallans();renderPays();},cli:()=>{$('cliLedger').hidden?renderCli():renderLedger();},prod:renderProd,set:loadSet,rep:renderReport})[tab]?.();
   window.scrollTo(0,0);
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
@@ -1002,6 +1034,138 @@ $('btnUndo').onclick=async()=>{
   }catch(e){fail(e);}finally{busy=false;}
 };
 
+/* ---------- reports ---------- */
+const inRange=(d,f,t)=>(!f||d>=f)&&(!t||d<=t);
+function repCos(){const cid=$('rCompany').value;return cid?coById(cid).name:'All companies';}
+function periodText(){const f=$('rFrom').value,t=$('rTo').value;
+  return f||t?`${f?fmtDate(f):'start'} to ${t?fmtDate(t):fmtDate(today())}`:'All dates';}
+function buildReport(){
+  const type=$('rType').value,cid=$('rCompany').value,f=$('rFrom').value,t=$('rTo').value;
+  const R={type,num:[],rows:[],foot:null};
+  if(type==='clients'){
+    R.title='Client list';R.sub=`${repCos()} · as of ${fmtDate(today())}`;
+    R.head=['Sr.','Client','Mobile','Address','Challans','Purchases (Rs)','Paid (Rs)','Balance (Rs)'];R.num=[5,6,7];
+    let P=0,Y=0,B=0,N=0;
+    allClientNames().forEach((n,i)=>{const tt=clientTotals(n,cid);const c=findClient(n)||{};
+      if(cid&&!tt.ch.length&&!tt.py.length)return;
+      R.rows.push([R.rows.length+1,n,c.phone||'',c.addr||'',tt.ch.length,tt.purchases,tt.paid,tt.bal]);N+=tt.ch.length;P+=tt.purchases;Y+=tt.paid;B+=tt.bal;});
+    R.foot=['','Total','','',N,r2(P),r2(Y),r2(B)];
+  }
+  if(type==='challans'){
+    R.title='Challan list';R.sub=`${repCos()} · ${periodText()}`;
+    R.head=['Sr.','Challan no.','Date','Client','Items','Total (Rs)','Paid at delivery (Rs)','Paid later (Rs)','Balance (Rs)','Delivery','Made by'];R.num=[5,6,7,8];
+    const list=db.challans.filter(c=>(!cid||c.companyId===+cid)&&inRange(c.date,f,t)).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.companyId-b.companyId)||(a.seq-b.seq));
+    let T=0,A=0,L=0,D=0;
+    list.forEach((c,i)=>{const later=r2(laterPaid(c)),due=dueOf(c);T+=c.total;A+=c.paid;L+=later;D+=due;
+      R.rows.push([i+1,c.no,fmtDate(c.date),c.client,c.items.map(x=>x.name+' x '+x.qty).join(', '),c.total,c.paid,later,due,c.dMode+(c.dName?' - '+c.dName:''),c.byName||'']);});
+    R.foot=['','',`${list.length} challan${list.length===1?'':'s'}`,'','',r2(T),r2(A),r2(L),r2(D),'',''];
+  }
+  if(type==='pending'){
+    R.title='Remaining payment list';R.sub=`${repCos()} · ${periodText()} · as of ${fmtDate(today())}`;
+    R.head=['Sr.','Client','Mobile','Challan no.','Date','Days','Total (Rs)','Paid (Rs)','Balance (Rs)'];R.num=[6,7,8];
+    const now=new Date(today());
+    const list=db.challans.filter(c=>(!cid||c.companyId===+cid)&&inRange(c.date,f,t)&&dueOf(c)>0)
+      .sort((a,b)=>a.client.localeCompare(b.client)||(a.date<b.date?-1:1));
+    let T=0,Y=0,D=0;const per={};
+    list.forEach((c,i)=>{const due=dueOf(c),paid=r2(c.total-due);T+=c.total;Y+=paid;D+=due;per[c.client]=(per[c.client]||0)+due;
+      R.rows.push([i+1,c.client,clientPhone(c.client,c.phone),c.no,fmtDate(c.date),Math.round((now-new Date(c.date))/864e5),c.total,paid,due]);});
+    R.foot=['',`${Object.keys(per).length} client${Object.keys(per).length===1?'':'s'}`,'',`${list.length} challan${list.length===1?'':'s'}`,'','',r2(T),r2(Y),r2(D)];
+    R.note='Payments recorded "on account" (not against a challan) are not shown here; the Client list shows each client\'s true balance.';
+  }
+  if(type==='ledger'){
+    const n=$('rClient').value;
+    const names=n?[n]:allClientNames();
+    R.title=n?'Client ledger: '+n:'Client ledgers (all clients)';
+    const c=n?findClient(n)||{}:{};
+    R.sub=`${repCos()} · ${periodText()}`+(n&&c.phone?` · Mobile ${c.phone}`:'');
+    R.head=n?['Date','Details','Purchase (Rs)','Paid (Rs)','Balance (Rs)']:['Client','Date','Details','Purchase (Rs)','Paid (Rs)','Balance (Rs)'];
+    const o=n?0:1;R.num=[2+o,3+o,4+o];
+    let DR=0,CR=0;
+    names.forEach(name=>{
+      const {rows}=ledgerRows(name,cid);if(!rows.length)return;
+      let open=0;const inside=[];
+      rows.forEach(r=>{if(f&&r.date<f)open=r.bal;else if(inRange(r.date,f,t))inside.push(r);});
+      if(!inside.length&&!open)return;
+      if(f)R.rows.push([...(n?[]:[name]),fmtDate(f),'Opening balance','','',open]);
+      inside.forEach(r=>{DR+=r.dr;CR+=r.cr;
+        R.rows.push([...(n?[]:[name]),fmtDate(r.date),rowDetail(r,true).replace(/<[^>]+>/g,'').replace(/&amp;/g,'&'),r.dr||'',r.cr||'',r.bal]);});
+      if(!n)R.rows.push(['','','Closing balance of '+name,'','',inside.length?inside[inside.length-1].bal:open]);
+    });
+    R.foot=n?['','Total for period',r2(DR),r2(CR),R.rows.length?R.rows[R.rows.length-1][4]:0]:['','','Total for period',r2(DR),r2(CR),''];
+  }
+  return R;
+}
+function repUI(){
+  const ty=$('rType').value;
+  $('rCliBox').hidden=ty!=='ledger';
+  $('rFromBox').hidden=$('rToBox').hidden=ty==='clients';
+}
+function fillRepClients(){const sel=$('rClient'),cur=sel.value;
+  sel.innerHTML='<option value="">All clients</option>'+allClientNames().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;}
+const cell=(v,isNum)=>isNum&&v!==''?num(v):esc(v);
+function renderReport(){
+  coOptions($('rCompany'),true);fillRepClients();repUI();
+  const R=buildReport();
+  $('rTitle').textContent=R.title;$('rSub').textContent=R.sub;
+  $('rHint').textContent=(R.note?R.note+' ':'')+`${R.rows.length} row${R.rows.length===1?'':'s'}.`;
+  $('rTable').innerHTML=`<thead><tr>${R.head.map((h,i)=>`<th class="${R.num.includes(i)?'n':''}">${esc(h)}</th>`).join('')}</tr></thead>
+   <tbody>${R.rows.length?R.rows.map(r=>`<tr>${r.map((v,i)=>`<td class="${R.num.includes(i)?'n money':''}">${cell(v,R.num.includes(i))}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${R.head.length}" class="hint">Nothing to show for these filters.</td></tr>`}</tbody>
+   ${R.foot&&R.rows.length?`<tfoot><tr>${R.foot.map((v,i)=>`<th class="${R.num.includes(i)?'n':''}" style="color:var(--ink)">${cell(v,R.num.includes(i)&&typeof v==='number')}</th>`).join('')}</tr></tfoot>`:''}`;
+}
+['rType','rCompany','rClient','rFrom','rTo'].forEach(id=>$(id).addEventListener('change',renderReport));
+const libs={};
+function loadLib(src){return libs[src]||(libs[src]=new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{delete libs[src];no(new Error('lib'));};document.head.appendChild(s);}));}
+const XLSX_SRC='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const JSPDF_SRC='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const AUTOTABLE_SRC='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+function fileName(R,ext){const n=$('rType').value==='ledger'&&$('rClient').value?$('rClient').value:R.title;
+  return ('PremierPools-'+n+'-'+today()).replace(/[^\w\-]+/g,'-').replace(/-+/g,'-')+'.'+ext;}
+async function withLib(btn,srcs,fn){
+  const old=btn.textContent;btn.disabled=true;btn.textContent='Preparing…';
+  try{for(const s of srcs)await loadLib(s);await fn();}
+  catch(e){console.error(e);toast('Could not make the file. Check internet and try again.');}
+  finally{btn.disabled=false;btn.textContent=old;}
+}
+$('rXls').onclick=()=>withLib($('rXls'),[XLSX_SRC],()=>{
+  const R=buildReport();if(!R.rows.length)return toast('Nothing to export for these filters');
+  const co=$('rCompany').value?coById($('rCompany').value):coById(activeCompany);
+  const aoa=[[co.name],[R.title],[R.sub],[],R.head,...R.rows];if(R.foot)aoa.push(R.foot);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=R.head.map((h,i)=>({wch:Math.min(45,Math.max(h.length,...R.rows.map(r=>String(r[i]??'').length))+2)}));
+  const first=5,last=aoa.length;
+  for(let r=first;r<=last;r++)R.num.forEach(c=>{const ref=XLSX.utils.encode_cell({r:r-1,c});if(ws[ref]&&typeof ws[ref].v==='number')ws[ref].z='#,##0.00';});
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,R.title.slice(0,31).replace(/[:\\\/?*\[\]]/g,' '));
+  XLSX.writeFile(wb,fileName(R,'xlsx'));toast('Excel file downloaded');
+});
+$('rPdf').onclick=()=>withLib($('rPdf'),[JSPDF_SRC,AUTOTABLE_SRC],()=>{
+  const R=buildReport();if(!R.rows.length)return toast('Nothing to export for these filters');
+  const co=$('rCompany').value?coById($('rCompany').value):coById(activeCompany);
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:R.head.length>6?'landscape':'portrait',unit:'mm',format:'a4'});
+  const fmt=(v,i)=>R.num.includes(i)&&typeof v==='number'?num(v):String(v??'');
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(co.name,14,15);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);
+  const line2=[co.addr,co.phone?'Ph: '+co.phone:'',co.gst?'GSTIN: '+co.gst:''].filter(Boolean).join('   ');if(line2)doc.text(line2,14,20);
+  doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(R.title,14,28);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(R.sub,14,33);
+  const colStyles={};R.num.forEach(i=>colStyles[i]={halign:'right'});
+  doc.autoTable({startY:37,head:[R.head],body:R.rows.map(r=>r.map(fmt)),foot:R.foot?[R.foot.map(fmt)]:undefined,showFoot:'lastPage',
+    styles:{fontSize:8,cellPadding:1.6,lineColor:[180,180,180],lineWidth:0.1},headStyles:{fillColor:[10,111,138]},footStyles:{fillColor:[227,241,244],textColor:20,fontStyle:'bold'},
+    columnStyles:colStyles,margin:{left:14,right:14},
+    didDrawPage:d=>{doc.setFontSize(8);doc.text(`Page ${doc.internal.getNumberOfPages()} · printed ${fmtDate(today())}`,doc.internal.pageSize.getWidth()-14,doc.internal.pageSize.getHeight()-8,{align:'right'});}});
+  if(R.note){doc.setFontSize(8);doc.text(doc.splitTextToSize(R.note,doc.internal.pageSize.getWidth()-28),14,doc.lastAutoTable.finalY+6);}
+  doc.save(fileName(R,'pdf'));toast('PDF downloaded');
+});
+$('rPrint').onclick=()=>{
+  const R=buildReport();if(!R.rows.length)return toast('Nothing to print for these filters');
+  const co=$('rCompany').value?coById($('rCompany').value):coById(activeCompany);
+  const fmt=(v,i)=>R.num.includes(i)&&typeof v==='number'?num(v):esc(v);
+  doPrint(`<div class="pc">${coHead(co,R.title.toUpperCase().slice(0,40),esc(R.sub))}
+  <table><thead><tr>${R.head.map((h,i)=>`<th style="${R.num.includes(i)?'text-align:right':''}">${esc(h)}</th>`).join('')}</tr></thead>
+  <tbody>${R.rows.map(r=>`<tr>${r.map((v,i)=>`<td style="${R.num.includes(i)?'text-align:right':''}">${fmt(v,i)}</td>`).join('')}</tr>`).join('')}</tbody>
+  ${R.foot?`<tfoot><tr>${R.foot.map((v,i)=>`<th style="${R.num.includes(i)?'text-align:right':''}">${fmt(v,i)}</th>`).join('')}</tr></tfoot>`:''}</table></div>`);
+};
+
 /* ---------- live sync ---------- */
 function onData(col){
   refreshLists();
@@ -1012,6 +1176,7 @@ function onData(col){
   if(curTab==='cli'){$('cliLedger').hidden?renderCli():renderLedger();}
   if(curTab==='prod'&&!$('prodRows').contains(document.activeElement))renderProd();
   if(curTab==='set'&&col==='trash')pwUI();
+  if(curTab==='rep'&&col!=='trash')renderReport();
   if(curTab==='set'&&col==='settings'&&!$('set').contains(document.activeElement))loadSet();
 }
 function listenErr(e){console.error(e);if(e.code==='permission-denied')toast('Your login does not have access. Ask the owner.');}

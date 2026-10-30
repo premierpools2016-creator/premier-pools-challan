@@ -1,5 +1,5 @@
 // Keeps the app working without internet. Bump VERSION after uploading changes.
-const VERSION = 'pp-challan-v1';
+const VERSION = 'pp-challan-v2';
 const SHELL = ['./', './index.html', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -12,7 +12,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   const sameOrigin = url.origin === self.location.origin;
-  const fixedLib = url.host === 'www.gstatic.com' || url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com';
+  const fixedLib = url.host === 'www.gstatic.com' || url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com' || url.host === 'cdnjs.cloudflare.com';
   if (!sameOrigin && !fixedLib) return; // database traffic is never cached here
   if (fixedLib) {
     // versioned libraries and fonts: cache first
