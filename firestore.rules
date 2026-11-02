@@ -7,7 +7,7 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function isOwner() {
       return signedIn() && request.auth.token.email != null
-        && request.auth.token.email.lower() in ['premierpools2016@gmail.com'];
+        && request.auth.token.email.lower() in ['premierpools2016@gmail.com', 'jatin776@gmail.com', 'bhavesh.rasania@gmail.com', 'javid1612patel@gmail.com'];
     }
 
     // Company details, print setting, delete password: everyone reads, only the owner changes.
@@ -29,6 +29,13 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
     match /payments/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (request.resource.data.by == request.auth.uid || isOwner());
+      allow update: if false;
+      allow delete: if isOwner();
+    }
+    // Material purchased from vendors (adds stock). Permanent; only the owner can delete a wrong entry.
+    match /purchases/{id} {
       allow read: if signedIn();
       allow create: if signedIn() && (request.resource.data.by == request.auth.uid || isOwner());
       allow update: if false;

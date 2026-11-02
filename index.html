@@ -81,6 +81,16 @@ td.n,th.n{text-align:right}
 tr.click{cursor:pointer}tr.click:hover td{background:var(--tile)}
 .lg-ch td{font-weight:600}
 .money{font-family:var(--mono)}
+.pill.low{background:var(--warn);color:#fff}
+.stk{font-size:.78rem;margin-top:3px;color:var(--muted)}
+.stk.low{color:var(--warn);font-weight:600}
+.namecell{display:flex;gap:6px}
+.namecell .btn{padding:6px 9px}
+nav .badge{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:99px;background:var(--warn);color:#fff;font-size:.72rem;line-height:18px;text-align:center}
+.scan{position:fixed;inset:0;z-index:35;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px max(16px,env(safe-area-inset-left,0px))}
+.scan #scanBox{width:100%;max-width:420px;background:#000;border-radius:10px;overflow:hidden;min-height:240px}
+.scan p{color:#fff;margin:0;text-align:center}
+.lblsheet{display:none}
 main td:first-child{white-space:nowrap}
 #lgRows,#histRows,#payRows,#cliRows{}
 main .tbl table{min-width:600px}
@@ -133,6 +143,14 @@ main .tbl table{min-width:600px}
   .pc.cmp .sig{padding:16px 10px 4px}
   .pc.cmp .sig div{font-size:8.5pt}
   .pc.cmp .copy{font-size:7.5pt;padding:1px 6px;line-height:1}
+  @page labels{size:A4;margin:0}
+  .lblsheet{display:grid!important;page:labels;break-after:page}
+  .lblsheet:last-child{break-after:auto}
+  .lbl{box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#000}
+  .lbl .ln{font:700 8.5pt/1.1 var(--body);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lbl .lc{font:600 6.5pt var(--body)}
+  .lbl svg{max-width:96%;height:auto}
+  .lbl .lp{font:700 8pt var(--body)}
   .cut{position:relative;border-top:1.5px dashed #000;margin:4mm 0;height:0}
   .cut span{position:absolute;left:50%;top:-6pt;transform:translateX(-50%);background:#fff;padding:0 8px;font-size:8pt;letter-spacing:.1em}
 }
@@ -149,7 +167,8 @@ main .tbl table{min-width:600px}
   <button data-tab="hist">Challans</button>
   <button data-tab="pay">Payments</button>
   <button data-tab="cli">Clients</button>
-  <button data-tab="prod">Products</button>
+  <button data-tab="pur">Purchase</button>
+  <button data-tab="prod">Stock<span class="badge" id="lowBadge" hidden></span></button>
   <button data-tab="rep">Reports</button>
   <button data-tab="set">Settings</button>
 </nav>
@@ -184,7 +203,7 @@ main .tbl table{min-width:600px}
       <thead><tr><th style="width:52px">Sr. No.</th><th>Product name</th><th class="n" style="width:80px">Qty</th><th class="n" style="width:110px">Price ₹</th><th class="n" style="width:110px">Amount ₹</th><th style="width:40px"></th></tr></thead>
       <tbody id="itemRows"></tbody>
     </table></div>
-    <div class="row" style="margin-top:10px"><button class="btn ghost sm" id="btnAddRow">+ Add item</button></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost sm" id="btnAddRow">+ Add item</button><button class="btn ghost sm" id="btnScanCh">Scan barcode</button></div>
   </div>
 
   <div class="card">
@@ -316,19 +335,77 @@ main .tbl table{min-width:600px}
   </div>
 </section>
 
-<!-- PRODUCTS -->
+<!-- PURCHASE -->
+<section id="pur">
+  <div class="card">
+    <h2>Material purchased from vendor</h2>
+    <div class="grid">
+      <div><label for="uDate">Date</label><input type="date" id="uDate"></div>
+      <div><label for="uVendor">Vendor name</label><input id="uVendor" list="dlVendors" placeholder="Type or pick a vendor"></div>
+      <div><label for="uBill">Vendor bill no.</label><input id="uBill" placeholder="Optional"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Items received</h2>
+    <div class="tbl"><table class="items">
+      <thead><tr><th style="width:52px">Sr. No.</th><th>Product name</th><th class="n" style="width:90px">Qty</th><th class="n" style="width:110px">Rate ₹</th><th class="n" style="width:110px">Amount ₹</th><th style="width:40px"></th></tr></thead>
+      <tbody id="purRows"></tbody>
+    </table></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost sm" id="btnAddPurRow">+ Add item</button><button class="btn ghost sm" id="btnScanPur">Scan barcode</button></div>
+    <div class="totals"><div class="tot"><span>Bill amount</span><b id="uTotal">₹0.00</b></div></div>
+    <div style="margin-top:12px"><label for="uNote">Remarks</label><input id="uNote" placeholder="Optional"></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btnSavePur">Save purchase (add to stock)</button><button class="btn ghost" id="btnClearPur">Clear</button></div>
+    <p class="hint">New product names are added to the Stock list automatically, with a barcode code.</p>
+  </div>
+  <div class="card">
+    <h2>Purchases</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Date</th><th>Vendor</th><th>Bill no.</th><th>Items</th><th class="n">Amount</th><th>Entered by</th><th></th></tr></thead>
+      <tbody id="purList"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- STOCK / PRODUCTS -->
 <section id="prod">
+  <div class="card">
+    <div class="totals" id="stkSum" style="margin-top:0"></div>
+  </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Stock list</h2>
+      <div class="row">
+        <input id="pSearch" placeholder="Search name or code" style="max-width:220px">
+        <label style="display:flex;align-items:center;gap:6px;margin:0;text-transform:none;letter-spacing:0;font-size:.9rem;color:var(--ink)"><input type="checkbox" id="pLowOnly" style="width:auto"> Low stock only</label>
+      </div>
+    </div>
+    <div class="tbl" style="margin-top:12px"><table style="min-width:860px"><thead><tr><th>Code</th><th>Product</th><th style="width:80px">Unit</th><th class="n" style="width:110px">Sale price ₹</th><th class="n" style="width:90px">Opening</th><th class="n" style="width:80px">Min</th><th class="n">In stock</th><th class="n adm" style="width:80px">Stickers</th><th style="width:44px"></th></tr></thead><tbody id="prodRows"></tbody></table></div>
+    <p class="hint">Stock = opening + purchases − challans. "Min" is the level at which the product shows LOW. Owners can edit opening, min and price.</p>
+  </div>
+  <div class="card">
+    <h2>Print barcode stickers</h2>
+    <p class="hint" style="margin-top:0">Type how many stickers you need in the "Stickers" column above, pick your sticker sheet, then print. Set the printer to A4, scale 100% (no "fit to page").</p>
+    <div class="grid">
+      <div><label for="lblSheet">Sticker sheet</label><select id="lblSheet">
+        <option value="24">A4, 24 stickers (3 × 8, 70 × 37 mm)</option>
+        <option value="40">A4, 40 stickers (4 × 10, 52.5 × 29.7 mm)</option>
+        <option value="65">A4, 65 stickers (5 × 13, 38 × 21 mm)</option>
+      </select></div>
+      <div><label for="lblPrice">Show sale price on sticker</label><select id="lblPrice"><option value="0">No</option><option value="1">Yes</option></select></div>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btnLabels">Print stickers</button><button class="btn ghost" id="btnLabelsLow">1 sticker for every product</button></div>
+  </div>
   <div class="card">
     <h2>Add product</h2>
     <div class="grid">
       <div><label for="npName">Product name</label><input id="npName" placeholder="e.g. Sand filter 24 inch"></div>
       <div><label for="npUnit">Unit</label><input id="npUnit" placeholder="Nos / Kg / Bag"></div>
-      <div><label for="npPrice">Price ₹</label><input type="number" id="npPrice" min="0" step="0.01"></div>
+      <div><label for="npPrice">Sale price ₹</label><input type="number" id="npPrice" min="0" step="0.01"></div>
+      <div><label for="npOpen">Stock in hand now</label><input type="number" id="npOpen" step="any" value="0"></div>
+      <div><label for="npMin">Minimum (low stock alert)</label><input type="number" id="npMin" min="0" step="any" value="0"></div>
+      <div><label for="npCode">Barcode code</label><input id="npCode" placeholder="Auto, or scan the box barcode"></div>
     </div>
-    <div class="row" style="margin-top:12px"><button class="btn" id="btnAddProd">Add product</button></div>
-  </div>
-  <div class="card"><h2>Product list</h2>
-    <div class="tbl"><table><thead><tr><th>Name</th><th>Unit</th><th class="n">Price ₹</th><th></th></tr></thead><tbody id="prodRows"></tbody></table></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btnAddProd">Add product</button><button class="btn ghost" id="btnScanCode">Scan box barcode</button></div>
   </div>
 </section>
 
@@ -343,6 +420,9 @@ main .tbl table{min-width:600px}
           <option value="challans">Challan list</option>
           <option value="pending">Remaining payment list</option>
           <option value="ledger">Client ledger</option>
+          <option value="stock">Stock report</option>
+          <option value="low">Low stock list</option>
+          <option value="purchases">Purchase list</option>
         </select></div>
       <div id="rCliBox"><label for="rClient">Client</label><select id="rClient"></select></div>
       <div><label for="rCompany">Company</label><select id="rCompany"></select></div>
@@ -411,7 +491,7 @@ main .tbl table{min-width:600px}
 </section>
 </main>
 
-<datalist id="dlClients"></datalist><datalist id="dlProducts"></datalist><datalist id="dlRecv"></datalist>
+<datalist id="dlClients"></datalist><datalist id="dlVendors"></datalist><datalist id="dlProducts"></datalist><datalist id="dlRecv"></datalist>
 <div class="pv" id="pv" hidden role="dialog" aria-modal="true" aria-labelledby="pvTitle">
   <div class="pv-box">
     <h2 id="pvTitle" style="margin:0">Check the challan</h2>
@@ -451,6 +531,11 @@ main .tbl table{min-width:600px}
     </div>
   </div>
 </div>
+<div class="scan" id="scanM" hidden role="dialog" aria-modal="true" aria-label="Scan barcode">
+  <p id="scanMsg">Point the camera at the barcode</p>
+  <div id="scanBox"></div>
+  <button class="btn" id="scanClose" style="background:#fff;color:#000;border-color:#fff">Close</button>
+</div>
 <div id="printArea"></div>
 <div class="toast" id="toast"></div>
 
@@ -475,7 +560,7 @@ const CFG=window.PP_CONFIG||{};
 const ADMINS=(CFG.adminEmails||[]).map(key);
 function blankCo(id,name,prefix,email){return {id,name,addr:'',phone:'',email:email||'',gst:'',prefix};}
 function defaultCos(){return [blankCo(1,'PREMIER POOLS','PP/DC/','premierpools2016@gmail.com'),blankCo(2,'','B/DC/'),blankCo(3,'','C/DC/')];}
-let db={companies:defaultCos(),copies:'2',delPass:'',products:[],clients:[],challans:[],payments:[],trash:[]};
+let db={companies:defaultCos(),copies:'2',delPass:'',products:[],clients:[],challans:[],payments:[],purchases:[],trash:[]};
 let fs=null,auth=null,me=null,isAdmin=false,myName='',subs=[];
 let activeCompany=+LS.get('pp_activeCompany',1)||1;
 const strip=o=>{const {_id,...rest}=o;return rest;};
@@ -490,6 +575,27 @@ const fmtNo=(co,seq)=>co.prefix+String(seq).padStart(4,'0');
 const laterPaid=c=>db.payments.filter(p=>p.challanId===c.id).reduce((a,p)=>a+p.amount,0);
 const dueOf=c=>Math.max(0,r2(c.total-c.paid-laterPaid(c)));
 const findClient=n=>db.clients.find(c=>key(c.name)===key(n));
+/* ---------- stock ---------- */
+const findProd=n=>db.products.find(p=>key(p.name)===key(n));
+const findCode=c=>{const k=key(c);return k?db.products.find(p=>key(p.code)===k):null;};
+function prodOf(it){if(it.pid){const p=db.products.find(x=>x._id===it.pid);if(p)return p;}return findProd(it.name);}
+function stockMap(){
+  const m={};db.products.forEach(p=>m[p._id]={opening:+p.opening||0,inQ:0,outQ:0});
+  db.purchases.forEach(u=>u.items.forEach(it=>{const p=prodOf(it);if(p&&m[p._id])m[p._id].inQ+=+it.qty||0;}));
+  db.challans.forEach(c=>c.items.forEach(it=>{const p=prodOf(it);if(p&&m[p._id])m[p._id].outQ+=+it.qty||0;}));
+  Object.values(m).forEach(v=>v.stock=Math.round((v.opening+v.inQ-v.outQ)*1000)/1000);
+  return m;
+}
+let STK={};
+const isLow=(p,st)=>st<0||((+p.min||0)>0&&st<=(+p.min||0));
+function nextCode(extra=0){const n=Math.max(0,...db.products.map(p=>{const m=String(p.code||'').match(/^P(\d+)$/i);return m?+m[1]:0;}));return 'P'+String(n+1+extra).padStart(4,'0');}
+function lowCount(){return db.products.filter(p=>isLow(p,STK[p._id]?STK[p._id].stock:0)).length;}
+function stockHint(el,name,qtyWanted){
+  const p=findProd(name);if(!p){el.textContent=name?'New product: will be added to the Stock list':'';el.className='stk';return;}
+  const st=STK[p._id]?STK[p._id].stock:0;const after=st-(qtyWanted||0);
+  el.textContent=`${p.code?p.code+' · ':''}In stock: ${st} ${p.unit||''}`+(qtyWanted&&after<0?' · not enough stock':'');
+  el.className='stk'+(qtyWanted&&after<0||isLow(p,st)?' low':'');
+}
 function clientTotals(name,cid){
   const ch=db.challans.filter(c=>key(c.client)===key(name)&&(!cid||c.companyId===+cid));
   const py=db.payments.filter(p=>key(p.client)===key(name)&&(!cid||p.companyId===+cid));
@@ -532,7 +638,7 @@ function go(tab){
   curTab=tab;
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.tab===tab));
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===tab));
-  ({hist:renderHist,pay:()=>{fillPayChallans();renderPays();},cli:()=>{$('cliLedger').hidden?renderCli():renderLedger();},prod:renderProd,set:loadSet,rep:renderReport})[tab]?.();
+  ({hist:renderHist,pay:()=>{fillPayChallans();renderPays();},cli:()=>{$('cliLedger').hidden?renderCli():renderLedger();},prod:()=>{ensureCodes();renderProd();},pur:()=>{renderPurList();calcPur();},set:loadSet,rep:renderReport})[tab]?.();
   window.scrollTo(0,0);
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
@@ -568,21 +674,31 @@ $('dMode').onchange=delivUI;
 function addRow(it={}){
   const tr=document.createElement('tr');
   tr.innerHTML=`<td class="sr"></td>
-    <td><input class="iName" list="dlProducts" value="${esc(it.name||'')}" placeholder="Product"></td>
+    <td><div class="namecell"><input class="iName" list="dlProducts" value="${esc(it.name||'')}" placeholder="Product or barcode"><button class="btn ghost sm iScan" type="button" aria-label="Scan barcode">Scan</button></div><div class="stk"></div></td>
     <td><input class="iQty" type="number" min="0" step="any" value="${it.qty??1}" style="text-align:right"></td>
     <td><input class="iPrice" type="number" min="0" step="0.01" value="${it.price??''}" style="text-align:right"></td>
     <td class="n iAmt">0.00</td>
-    <td><button class="btn danger sm" aria-label="Remove item">✕</button></td>`;
-  tr.querySelector('.iName').addEventListener('change',e=>{
-    const p=db.products.find(p=>key(p.name)===key(e.target.value));
-    if(p){tr.querySelector('.iPrice').value=p.price;calc();}
-  });
-  tr.querySelector('button').onclick=()=>{tr.remove();if(!$('itemRows').children.length)addRow();calc();};
+    <td><button class="btn danger sm iDel" aria-label="Remove item">✕</button></td>`;
+  const nm=tr.querySelector('.iName'),hint=tr.querySelector('.stk');
+  nm.addEventListener('change',()=>{const byCode=findCode(nm.value);if(byCode)nm.value=byCode.name;
+    const p=findProd(nm.value);if(p)tr.querySelector('.iPrice').value=p.price;calc();});
+  tr.querySelector('.iScan').onclick=()=>openScan(code=>{const p=findCode(code)||findProd(code);if(!p)return toast('No product has code '+code+'. Add it in Stock first.');nm.value=p.name;tr.querySelector('.iPrice').value=p.price;calc();});
+  tr.querySelector('.iDel').onclick=()=>{tr.remove();if(!$('itemRows').children.length)addRow();calc();};
   tr.addEventListener('input',calc);
   $('itemRows').appendChild(tr);calc();
 }
+function addScannedTo(tbody,addFn,code,priceField){
+  const p=findCode(code)||findProd(code);
+  if(!p)return toast('No product has code '+code+'. Add it in Stock first.');
+  const row=[...tbody.children].find(tr=>key(tr.querySelector('.iName').value)===key(p.name));
+  if(row){const q=row.querySelector('.iQty');q.value=(+q.value||0)+1;q.dispatchEvent(new Event('input',{bubbles:true}));toast(p.name+': qty '+q.value);return;}
+  const empty=[...tbody.children].find(tr=>!tr.querySelector('.iName').value.trim());
+  if(empty){empty.querySelector('.iName').value=p.name;empty.querySelector('.iName').dispatchEvent(new Event('change'));}
+  else addFn({name:p.name,qty:1,[priceField]:priceField==='price'?p.price:''});
+  toast('Added '+p.name);
+}
 function readItems(){
-  return [...$('itemRows').children].map(tr=>({name:tr.querySelector('.iName').value.trim(),qty:+tr.querySelector('.iQty').value||0,price:+tr.querySelector('.iPrice').value||0})).filter(i=>i.name);
+  return [...$('itemRows').children].map(tr=>{const name=tr.querySelector('.iName').value.trim();const p=findProd(name);const o={name,qty:+tr.querySelector('.iQty').value||0,price:+tr.querySelector('.iPrice').value||0};if(p)o.pid=p._id;return o;}).filter(i=>i.name);
 }
 function calc(){
   let total=0;
@@ -590,6 +706,7 @@ function calc(){
     tr.querySelector('.sr').textContent=i+1;
     const a=(+tr.querySelector('.iQty').value||0)*(+tr.querySelector('.iPrice').value||0);
     tr.querySelector('.iAmt').textContent=num(a);total+=a;
+    stockHint(tr.querySelector('.stk'),tr.querySelector('.iName').value.trim(),+tr.querySelector('.iQty').value||0);
   });
   total=r2(total);const paid=r2($('pPaid').value);
   $('tTotal').textContent=inr(total);$('tPaid').textContent=inr(paid);$('tDue').textContent=inr(Math.max(total-paid,0));
@@ -609,6 +726,7 @@ $('cClient').addEventListener('change',()=>{
   showClientBal();
 });
 $('btnAddRow').onclick=()=>addRow();
+$('btnScanCh').onclick=()=>openScan(code=>addScannedTo($('itemRows'),addRow,code,'price'));
 function resetForm(){
   showNo();$('cDate').value=today();
   ['cClient','cPhone','cAddr','pRef','pRecv','cNote','dName','dMobile','dVeh'].forEach(i=>$(i).value='');
@@ -665,8 +783,12 @@ function upsertClientAndProducts(c){
   const cl=findClient(c.client);
   if(!cl)write(fs.collection('clients').add({name:c.client,phone:c.phone,addr:c.addr}));
   else if((!cl.phone&&c.phone)||(!cl.addr&&c.addr))write(fs.collection('clients').doc(cl._id).update({phone:cl.phone||c.phone,addr:cl.addr||c.addr}));
-  const seen=new Set(db.products.map(p=>key(p.name)));
-  c.items.forEach(it=>{if(!seen.has(key(it.name))){seen.add(key(it.name));write(fs.collection('products').add({name:it.name,unit:'Nos',price:it.price}));}});
+  addNewProducts(c.items,'price');
+}
+function addNewProducts(items,priceField){
+  const seen=new Set(db.products.map(p=>key(p.name)));let k=0;
+  items.forEach(it=>{if(!seen.has(key(it.name))){seen.add(key(it.name));
+    write(fs.collection('products').add({name:it.name,unit:'Nos',price:priceField==='price'?+it.price||0:0,code:nextCode(k++),opening:0,min:0}));}});
 }
 let lastId=null;
 function afterSave(c){lastId=c.id;$('lsNo').textContent=c.no;$('lsClient').textContent=c.client;$('lastSaved').hidden=false;resetForm();window.scrollTo(0,0);}
@@ -902,18 +1024,142 @@ $('lgPrint').onclick=()=>{
   <div class="sig"><div>Client's signature</div><div>For ${esc(co.name)}</div></div></div>`);
 };
 
-/* ---------- products (staff can add; only the owner can change or delete) ---------- */
+/* ---------- stock tab (staff can add products; only the owner can change or delete) ---------- */
+const lblQty={};
 function renderProd(){
-  const ro=isAdmin?'':' readonly';
-  $('prodRows').innerHTML=db.products.map(p=>`<tr><td><input value="${esc(p.name)}" data-id="${p._id}" data-f="name"${ro}></td><td style="width:110px"><input value="${esc(p.unit)}" data-id="${p._id}" data-f="unit"${ro}></td>
-   <td class="n" style="width:130px"><input type="number" value="${p.price}" data-id="${p._id}" data-f="price" style="text-align:right"${ro}></td><td style="width:50px">${isAdmin?`<button class="btn danger sm" data-del="${p._id}" aria-label="Delete product">✕</button>`:''}</td></tr>`).join('')||'<tr><td colspan="4" class="hint">No products yet.</td></tr>';
+  const q=key($('pSearch').value),lowOnly=$('pLowOnly').checked,ro=isAdmin?'':' readonly';
+  const rows=db.products.filter(p=>(!q||key(p.name).includes(q)||key(p.code).includes(q))&&(!lowOnly||isLow(p,STK[p._id]?STK[p._id].stock:0)));
+  let units=0;db.products.forEach(p=>units+=Math.max(0,STK[p._id]?STK[p._id].stock:0));
+  const low=lowCount();
+  $('stkSum').innerHTML=`<div class="tot"><span>Products</span><b>${db.products.length}</b></div><div class="tot ${low?'due':''}"><span>Low stock</span><b>${low}</b></div>
+    <div class="tot"><span>Purchases saved</span><b>${db.purchases.length}</b></div>`;
+  $('prodRows').innerHTML=rows.map(p=>{const v=STK[p._id]||{stock:0},lw=isLow(p,v.stock);
+    return `<tr><td class="cno">${esc(p.code||'')}</td>
+    <td><input value="${esc(p.name)}" data-id="${p._id}" data-f="name"${ro}></td>
+    <td><input value="${esc(p.unit||'')}" data-id="${p._id}" data-f="unit"${ro}></td>
+    <td class="n"><input type="number" value="${+p.price||0}" data-id="${p._id}" data-f="price" style="text-align:right"${ro}></td>
+    <td class="n"><input type="number" value="${+p.opening||0}" data-id="${p._id}" data-f="opening" style="text-align:right"${ro}></td>
+    <td class="n"><input type="number" value="${+p.min||0}" data-id="${p._id}" data-f="min" style="text-align:right"${ro}></td>
+    <td class="n"><span class="pill ${lw?'low':'clear'}">${v.stock} ${esc(p.unit||'')}${lw?' · LOW':''}</span></td>
+    <td class="n adm"><input type="number" min="0" value="${lblQty[p._id]||''}" data-lbl="${p._id}" placeholder="0" style="text-align:right"></td>
+    <td>${isAdmin?`<button class="btn danger sm" data-del="${p._id}" aria-label="Delete product">✕</button>`:''}</td></tr>`;}).join('')
+    ||`<tr><td colspan="9" class="hint">${db.products.length?'No product matches.':'No products yet. Add them below, or save a purchase.'}</td></tr>`;
 }
-$('prodRows').onchange=e=>{const t=e.target;if(t.dataset.f&&isAdmin){write(fs.collection('products').doc(t.dataset.id).update({[t.dataset.f]:t.dataset.f==='price'?+t.value:t.value}));toast('Product updated');}};
-$('prodRows').onclick=e=>{const b=e.target.closest('[data-del]');if(b&&isAdmin)write(fs.collection('products').doc(b.dataset.del).delete());};
+$('pSearch').oninput=renderProd;$('pLowOnly').onchange=renderProd;
+$('prodRows').onchange=e=>{const t=e.target;
+  if(t.dataset.lbl){lblQty[t.dataset.lbl]=Math.max(0,+t.value||0);return;}
+  if(t.dataset.f&&isAdmin){const f=t.dataset.f;const v=['price','opening','min'].includes(f)?+t.value||0:t.value.trim();
+    if(f==='name'&&db.products.some(p=>p._id!==t.dataset.id&&key(p.name)===key(v)))return toast('Another product already has this name');
+    write(fs.collection('products').doc(t.dataset.id).update({[f]:v}));toast('Product updated');}};
+$('prodRows').onclick=e=>{const b=e.target.closest('[data-del]');if(!b||!isAdmin)return;
+  if(b.dataset.sure){write(fs.collection('products').doc(b.dataset.del).delete());}
+  else{b.dataset.sure=1;b.textContent='Sure?';setTimeout(()=>{if(b.isConnected){b.textContent='✕';delete b.dataset.sure;}},3000);}};
 $('btnAddProd').onclick=()=>{const n=$('npName').value.trim();if(!n)return toast('Enter product name');
-  if(db.products.some(p=>key(p.name)===key(n)))return toast('This product is already in the list');
-  write(fs.collection('products').add({name:n,unit:$('npUnit').value.trim()||'Nos',price:+$('npPrice').value||0}));
-  ['npName','npUnit','npPrice'].forEach(i=>$(i).value='');toast('Product added');};
+  if(findProd(n))return toast('This product is already in the list');
+  const code=$('npCode').value.trim()||nextCode();
+  if(findCode(code))return toast('Another product already uses code '+code);
+  write(fs.collection('products').add({name:n,unit:$('npUnit').value.trim()||'Nos',price:+$('npPrice').value||0,opening:+$('npOpen').value||0,min:+$('npMin').value||0,code}));
+  ['npName','npUnit','npPrice','npCode'].forEach(i=>$(i).value='');$('npOpen').value=0;$('npMin').value=0;toast('Product added');};
+$('btnScanCode').onclick=()=>openScan(code=>{$('npCode').value=code;const p=findCode(code);if(p)toast('Code already used by '+p.name);});
+/* give old products a barcode code (owner only, once) */
+let coding=false;
+function ensureCodes(){
+  if(!isAdmin||coding)return;const miss=db.products.filter(p=>!p.code);if(!miss.length)return;
+  coding=true;const ops=[];let k=0;miss.forEach(p=>{const c=nextCode(k++);ops.push(b=>b.update(fs.collection('products').doc(p._id),{code:c}));});
+  runOps(ops).catch(fail).finally(()=>{coding=false;});
+}
+
+/* ---------- barcode stickers ---------- */
+const JSBARCODE_SRC='https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js';
+const SHEETS={24:{cols:3,rows:8,w:70,h:37.125,top:0,left:0,gx:0,gy:0},40:{cols:4,rows:10,w:52.5,h:29.7,top:0,left:0,gx:0,gy:0},65:{cols:5,rows:13,w:38.1,h:21.2,top:10.7,left:4.65,gx:2.5,gy:0}};
+function barcodeSVG(code,h){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  JsBarcode(svg,code,{format:'CODE128',displayValue:false,height:h,width:1.5,margin:0});return svg.outerHTML;}
+function printLabels(list){
+  const S=SHEETS[$('lblSheet').value],showP=$('lblPrice').value==='1',small=$('lblSheet').value==='65';
+  const per=S.cols*S.rows,labels=[];list.forEach(({p,n})=>{for(let i=0;i<n;i++)labels.push(p);});
+  if(!labels.length)return toast('Type how many stickers you need in the Stickers column');
+  const bh=small?22:S.h>32?34:26;
+  const cell=p=>`<div class="lbl" style="width:${S.w}mm;height:${S.h}mm;padding:${small?'0.8mm':'1.5mm 2mm'}">
+    ${small?'':`<div class="lc">${esc(coById(activeCompany).name)}</div>`}<div class="ln" style="${small?'font-size:6.5pt':''}">${esc(p.name)}</div>
+    ${barcodeSVG(p.code,bh)}<div class="lc" style="${small?'font-size:6pt':''}">${esc(p.code)}${showP?` · Rs ${num(p.price)}`:''}</div></div>`;
+  let html='';
+  for(let i=0;i<labels.length;i+=per){
+    html+=`<div class="lblsheet" style="width:210mm;height:297mm;padding:${S.top}mm 0 0 ${S.left}mm;box-sizing:border-box;grid-template-columns:repeat(${S.cols},${S.w}mm);grid-auto-rows:${S.h}mm;column-gap:${S.gx}mm;row-gap:${S.gy}mm;align-content:start">${labels.slice(i,i+per).map(cell).join('')}</div>`;
+  }
+  doPrint(html);
+}
+$('btnLabels').onclick=()=>withLib($('btnLabels'),[JSBARCODE_SRC],()=>{
+  const list=db.products.filter(p=>lblQty[p._id]>0&&p.code).map(p=>({p,n:lblQty[p._id]}));printLabels(list);});
+$('btnLabelsLow').onclick=()=>withLib($('btnLabelsLow'),[JSBARCODE_SRC],()=>{
+  const list=db.products.filter(p=>p.code).map(p=>({p,n:1}));printLabels(list);});
+
+/* ---------- camera scanner ---------- */
+const SCAN_SRC='https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
+let scanner=null,scanCb=null;
+async function openScan(cb){
+  scanCb=cb;$('scanM').hidden=false;$('scanMsg').textContent='Starting camera…';
+  try{
+    await loadLib(SCAN_SRC);
+    const F=window.Html5QrcodeSupportedFormats;
+    scanner=new Html5Qrcode('scanBox',{formatsToSupport:[F.CODE_128,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_39,F.QR_CODE],verbose:false});
+    await scanner.start({facingMode:'environment'},{fps:10,qrbox:(w,h)=>({width:Math.floor(w*0.85),height:Math.floor(Math.min(h,w)*0.45)})},
+      text=>{const f=scanCb;closeScan();if(navigator.vibrate)navigator.vibrate(80);f&&f(String(text).trim());},()=>{});
+    $('scanMsg').textContent='Point the camera at the barcode';
+  }catch(e){console.error(e);$('scanMsg').textContent='Camera could not start. Allow camera access for this app, or type the code in the product box.';}
+}
+async function closeScan(){$('scanM').hidden=true;scanCb=null;if(scanner){try{await scanner.stop();}catch(e){}try{scanner.clear();}catch(e){}scanner=null;}}
+$('scanClose').onclick=closeScan;
+
+/* ---------- purchases ---------- */
+function addPurRow(it={}){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="sr"></td>
+    <td><div class="namecell"><input class="iName" list="dlProducts" value="${esc(it.name||'')}" placeholder="Product or barcode"><button class="btn ghost sm iScan" type="button" aria-label="Scan barcode">Scan</button></div><div class="stk"></div></td>
+    <td><input class="iQty" type="number" min="0" step="any" value="${it.qty??1}" style="text-align:right"></td>
+    <td><input class="iRate" type="number" min="0" step="0.01" value="${it.rate??''}" style="text-align:right"></td>
+    <td class="n iAmt">0.00</td>
+    <td><button class="btn danger sm iDel" aria-label="Remove item">✕</button></td>`;
+  const nm=tr.querySelector('.iName');
+  nm.addEventListener('change',()=>{const p=findCode(nm.value);if(p)nm.value=p.name;calcPur();});
+  tr.querySelector('.iScan').onclick=()=>openScan(code=>{const p=findCode(code)||findProd(code);if(!p)return toast('No product has code '+code+'. Add it in Stock first.');nm.value=p.name;calcPur();});
+  tr.querySelector('.iDel').onclick=()=>{tr.remove();if(!$('purRows').children.length)addPurRow();calcPur();};
+  tr.addEventListener('input',calcPur);
+  $('purRows').appendChild(tr);calcPur();
+}
+function calcPur(){let t=0;
+  [...$('purRows').children].forEach((tr,i)=>{tr.querySelector('.sr').textContent=i+1;
+    const a=(+tr.querySelector('.iQty').value||0)*(+tr.querySelector('.iRate').value||0);tr.querySelector('.iAmt').textContent=num(a);t+=a;
+    const el=tr.querySelector('.stk'),n=tr.querySelector('.iName').value.trim(),p=findProd(n);
+    if(!n){el.textContent='';el.className='stk';}
+    else if(!p){el.textContent='New product: will be added to Stock';el.className='stk';}
+    else{const st=STK[p._id]?STK[p._id].stock:0,q=+tr.querySelector('.iQty').value||0;el.textContent=`${p.code||''} · Now ${st} → after ${Math.round((st+q)*1000)/1000} ${p.unit||''}`;el.className='stk';}});
+  $('uTotal').textContent=inr(t);return r2(t);}
+function resetPur(){$('uDate').value=today();['uVendor','uBill','uNote'].forEach(i=>$(i).value='');$('purRows').innerHTML='';addPurRow();}
+$('btnAddPurRow').onclick=()=>addPurRow();
+$('btnScanPur').onclick=()=>openScan(code=>addScannedTo($('purRows'),addPurRow,code,'rate'));
+$('btnClearPur').onclick=resetPur;
+$('btnSavePur').onclick=()=>{
+  const items=[...$('purRows').children].map(tr=>({name:tr.querySelector('.iName').value.trim(),qty:+tr.querySelector('.iQty').value||0,rate:+tr.querySelector('.iRate').value||0})).filter(i=>i.name);
+  if(!$('uVendor').value.trim())return toast('Enter the vendor name');
+  if(!items.length)return toast('Add at least one item');
+  if(items.some(i=>!(i.qty>0)))return toast('Every item needs a quantity');
+  if(!confirmTap($('btnSavePur')))return;
+  addNewProducts(items,'rate');
+  const u={id:Date.now(),date:$('uDate').value||today(),vendor:$('uVendor').value.trim(),bill:$('uBill').value.trim(),note:$('uNote').value.trim(),
+    items:items.map(i=>{const p=findProd(i.name);return p?{...i,pid:p._id}:i;}),total:calcPur(),by:me.uid,byName:myName,savedAt:Date.now()};
+  write(fs.collection('purchases').doc(String(u.id)).set(u));
+  resetPur();toast('Purchase saved. Stock updated.'+(navigator.onLine?'':' It will upload when internet is back.'));
+};
+function renderPurList(){
+  $('dlVendors').innerHTML=[...new Set(db.purchases.map(u=>u.vendor))].map(v=>`<option value="${esc(v)}">`).join('');
+  $('purList').innerHTML=db.purchases.length?db.purchases.map(u=>`<tr><td>${fmtDate(u.date)}</td><td>${esc(u.vendor)}</td><td>${esc(u.bill||'')}</td>
+    <td>${u.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</td><td class="n money">${inr(u.total)}</td><td>${esc(u.byName||'')}</td>
+    <td>${isAdmin?`<button class="btn danger sm" data-pdel="${u._id}">Delete</button>`:''}</td></tr>`).join('')
+    :'<tr><td colspan="7" class="hint">No purchases yet. Save one above to add stock.</td></tr>';
+}
+$('purList').onclick=e=>{const b=e.target.closest('[data-pdel]');if(!b||!isAdmin)return;
+  if(b.dataset.sure){write(fs.collection('purchases').doc(b.dataset.pdel).delete());toast('Purchase deleted. Stock reduced.');}
+  else{b.dataset.sure=1;b.textContent='Tap again to delete';setTimeout(()=>{if(b.isConnected){b.textContent='Delete';delete b.dataset.sure;}},4000);}};
 
 /* ---------- settings ---------- */
 const coFields=[['name','Company name'],['phone','Phone'],['email','Email'],['gst','GSTIN'],['addr','Address'],['prefix','Challan no. prefix']];
@@ -937,13 +1183,13 @@ $('btnSaveSet').onclick=()=>{
   write(settingsRef().set({companies:cos,copies:$('sCopies').value},{merge:true}));toast('Settings saved');
 };
 function backupData(){return {exportedAt:new Date().toISOString(),companies:db.companies,copies:db.copies,
-  products:db.products.map(strip),clients:db.clients.map(strip),challans:db.challans.map(strip),payments:db.payments.map(strip)};}
+  products:db.products.map(strip),clients:db.clients.map(strip),challans:db.challans.map(strip),payments:db.payments.map(strip),purchases:db.purchases.map(strip)};}
 $('btnExport').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(backupData(),null,1)],{type:'application/json'}));
   a.download='premier-pools-backup-'+today()+'.json';a.click();toast('Backup downloaded');};
 
 /* old single-phone backups use another shape; bring them to this one */
 function migrate(d){
-  d.products=d.products||[];d.clients=d.clients||[];d.challans=d.challans||[];d.payments=d.payments||[];
+  d.products=d.products||[];d.clients=d.clients||[];d.challans=d.challans||[];d.payments=d.payments||[];d.purchases=d.purchases||[];
   if(!d.companies&&d.settings){const s=d.settings;d.companies=defaultCos();Object.assign(d.companies[0],{name:s.name||'PREMIER POOLS',addr:s.addr||'',phone:s.phone||'',email:s.email||d.companies[0].email,gst:s.gst||'',prefix:s.prefix||'PP/DC/'});d.copies=s.copies||'2';}
   d.challans.forEach(c=>{if(!c.companyId)c.companyId=1;if(!c.seq){const m=String(c.no).match(/(\d+)\s*$/);c.seq=m?+m[1]:0;}c.paid=+c.paid||0;});
   return d;
@@ -958,6 +1204,8 @@ async function importData(d,label){
     const doc={...strip(c),by:c.by||me.uid,byName:c.byName||myName};ops.push(b=>b.set(fs.collection('challans').doc(id),doc));});
   d.payments.forEach(p=>{const id=String(p.id);if(pIds.has(id))return;pIds.add(id);
     const doc={...strip(p),by:p.by||me.uid,byName:p.byName||myName};ops.push(b=>b.set(fs.collection('payments').doc(id),doc));});
+  const uIds=new Set(db.purchases.map(u=>u._id));
+  d.purchases.forEach(u=>{const id=String(u.id);if(uIds.has(id))return;uIds.add(id);ops.push(b=>b.set(fs.collection('purchases').doc(id),{...strip(u),by:u.by||me.uid,byName:u.byName||myName}));});
   d.clients.forEach(c=>{if(cl.has(key(c.name)))return;cl.add(key(c.name));ops.push(b=>b.set(fs.collection('clients').doc(),strip(c)));});
   d.products.forEach(p=>{if(pr.has(key(p.name)))return;pr.add(key(p.name));ops.push(b=>b.set(fs.collection('products').doc(),strip(p)));});
   await runOps(ops);
@@ -983,7 +1231,7 @@ function pwUI(){
   $('pwOldBox').hidden=!has;$('btnPw').textContent=has?'Change password':'Set password';
   const tr=db.trash;$('trashBox').hidden=!tr.length;
   if(tr.length){const n=c=>tr.filter(t=>t.col===c).length;
-    $('trashInfo').textContent=`Deleted on ${new Date(Math.max(...tr.map(t=>t.at))).toLocaleString('en-IN')}: ${n('challans')} challans, ${n('payments')} payments, ${n('clients')} clients, ${n('products')} products.`;}
+    $('trashInfo').textContent=`Deleted on ${new Date(Math.max(...tr.map(t=>t.at))).toLocaleString('en-IN')}: ${n('challans')} challans, ${n('payments')} payments, ${n('clients')} clients, ${n('products')} products, ${n('purchases')} purchases.`;}
 }
 $('btnPw').onclick=()=>{
   if(db.delPass&&hashPw($('pwOld').value)!==db.delPass)return toast('Current password is wrong');
@@ -998,7 +1246,7 @@ $('btnWipe').onclick=async()=>{
   if(!db.delPass)return toast('Set a delete password first');
   if(hashPw($('wPass').value)!==db.delPass)return toast('Wrong password. Nothing was deleted');
   if($('wWord').value.trim().toUpperCase()!=='DELETE')return toast('Type DELETE in the box to confirm');
-  const cols=['challans','payments','clients','products'];
+  const cols=['challans','payments','clients','products','purchases'];
   if(!cols.some(c=>db[c].length))return toast('There is no data to delete');
   if(!navigator.onLine)return toast('Connect to the internet to delete');
   busy=true;toast('Deleting…');
@@ -1020,7 +1268,7 @@ $('btnUndo').onclick=async()=>{
   if(!navigator.onLine)return toast('Connect to the internet to restore');
   busy=true;
   try{
-    const live={challans:new Set(db.challans.map(c=>c._id)),payments:new Set(db.payments.map(p=>p._id))};
+    const live={challans:new Set(db.challans.map(c=>c._id)),payments:new Set(db.payments.map(p=>p._id)),purchases:new Set(db.purchases.map(u=>u._id))};
     const names={clients:new Set(db.clients.map(c=>key(c.name))),products:new Set(db.products.map(p=>key(p.name)))};
     const ops=[];let clash=0;
     db.trash.forEach(t=>{
@@ -1093,12 +1341,27 @@ function buildReport(){
     });
     R.foot=n?['','Total for period',r2(DR),r2(CR),R.rows.length?R.rows[R.rows.length-1][4]:0]:['','','Total for period',r2(DR),r2(CR),''];
   }
+  if(type==='stock'||type==='low'){
+    R.title=type==='low'?'Low stock list':'Stock report';R.sub=`All companies (shared stock) · as of ${fmtDate(today())}`;
+    R.head=['Sr.','Code','Product','Unit','Opening','Purchased','Sold','In stock','Min','Status'];
+    db.products.forEach(p=>{const v=STK[p._id]||{opening:0,inQ:0,outQ:0,stock:0},lw=isLow(p,v.stock);if(type==='low'&&!lw)return;
+      R.rows.push([R.rows.length+1,p.code||'',p.name,p.unit||'',v.opening,v.inQ,v.outQ,v.stock,+p.min||0,v.stock<0?'NEGATIVE':lw?'LOW':'OK']);});
+    R.foot=['','',`${R.rows.length} product${R.rows.length===1?'':'s'}`,'','','','','','',''];
+  }
+  if(type==='purchases'){
+    R.title='Purchase list';R.sub=`All companies · ${periodText()}`;
+    R.head=['Sr.','Date','Vendor','Bill no.','Items','Amount (Rs)','Entered by'];R.num=[5];
+    let T=0;db.purchases.filter(u=>inRange(u.date,f,t)).slice().reverse().forEach(u=>{T+=u.total;
+      R.rows.push([R.rows.length+1,fmtDate(u.date),u.vendor,u.bill||'',u.items.map(i=>i.name+' x '+i.qty).join(', '),u.total,u.byName||'']);});
+    R.foot=['','',`${R.rows.length} purchase${R.rows.length===1?'':'s'}`,'','',r2(T),''];
+  }
   return R;
 }
 function repUI(){
   const ty=$('rType').value;
   $('rCliBox').hidden=ty!=='ledger';
-  $('rFromBox').hidden=$('rToBox').hidden=ty==='clients';
+  $('rFromBox').hidden=$('rToBox').hidden=['clients','stock','low'].includes(ty);
+  $('rCompany').closest('div').hidden=['stock','low','purchases'].includes(ty);
 }
 function fillRepClients(){const sel=$('rClient'),cur=sel.value;
   sel.innerHTML='<option value="">All clients</option>'+allClientNames().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
@@ -1168,13 +1431,17 @@ $('rPrint').onclick=()=>{
 
 /* ---------- live sync ---------- */
 function onData(col){
+  STK=stockMap();
+  const lc=lowCount();$('lowBadge').hidden=!lc;$('lowBadge').textContent=lc;
   refreshLists();
   if($('pv').hidden)showNo();
   showClientBal();
   if(curTab==='hist')renderHist();
   if(curTab==='pay')renderPays();
   if(curTab==='cli'){$('cliLedger').hidden?renderCli():renderLedger();}
-  if(curTab==='prod'&&!$('prodRows').contains(document.activeElement))renderProd();
+  if(curTab==='prod'&&!$('prod').contains(document.activeElement))renderProd();
+  if(curTab==='pur'){renderPurList();calcPur();}
+  if(curTab==='new'&&$('pv').hidden)calc();
   if(curTab==='set'&&col==='trash')pwUI();
   if(curTab==='rep'&&col!=='trash')renderReport();
   if(curTab==='set'&&col==='settings'&&!$('set').contains(document.activeElement))loadSet();
@@ -1183,12 +1450,12 @@ function listenErr(e){console.error(e);if(e.code==='permission-denied')toast('Yo
 function listen(){
   subs.push(settingsRef().onSnapshot(d=>{const v=d.exists?d.data():{};
     if(Array.isArray(v.companies)&&v.companies.length)db.companies=v.companies;db.copies=v.copies||'2';db.delPass=v.delPass||'';onData('settings');},listenErr));
-  const order={challans:(a,b)=>(b.savedAt||b.id)-(a.savedAt||a.id),payments:(a,b)=>b.id-a.id,clients:(a,b)=>a.name.localeCompare(b.name),products:(a,b)=>a.name.localeCompare(b.name)};
+  const order={purchases:(a,b)=>(b.date<a.date?-1:b.date>a.date?1:b.id-a.id),challans:(a,b)=>(b.savedAt||b.id)-(a.savedAt||a.id),payments:(a,b)=>b.id-a.id,clients:(a,b)=>a.name.localeCompare(b.name),products:(a,b)=>a.name.localeCompare(b.name)};
   Object.keys(order).forEach(col=>subs.push(fs.collection(col).onSnapshot(s=>{
     db[col]=s.docs.map(d=>({...d.data(),_id:d.id})).sort(order[col]);onData(col);},listenErr)));
   if(isAdmin)subs.push(fs.collection('trash').onSnapshot(s=>{db.trash=s.docs.map(d=>({...d.data(),_id:d.id}));onData('trash');},listenErr));
 }
-function stopListening(){subs.forEach(u=>u());subs=[];db={...db,products:[],clients:[],challans:[],payments:[],trash:[]};}
+function stopListening(){subs.forEach(u=>u());subs=[];db={...db,products:[],clients:[],challans:[],payments:[],purchases:[],trash:[]};}
 
 /* ---------- sign in ---------- */
 function gate(view){['gLoad','gLogin','gName','gSetup'].forEach(id=>$(id).hidden=id!==view);$('gate').hidden=!view;}
@@ -1230,7 +1497,7 @@ async function startSession(u){
 /* ---------- start ---------- */
 function netUI(){$('net').hidden=navigator.onLine;}
 window.addEventListener('online',netUI);window.addEventListener('offline',netUI);netUI();
-$('yDate').value=today();refUI('yMode','yRefBox','yRefLbl');
+$('yDate').value=today();refUI('yMode','yRefBox','yRefLbl');resetPur();
 refreshLists();resetForm();
 const configured=CFG.firebase&&CFG.firebase.apiKey&&!/PASTE/i.test(CFG.firebase.apiKey)&&window.firebase;
 if(!configured)gate('gSetup');
