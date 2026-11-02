@@ -166,6 +166,7 @@ main .tbl table{min-width:600px}
   <button data-tab="new" class="on">New Challan</button>
   <button data-tab="hist">Challans</button>
   <button data-tab="pay">Payments</button>
+  <button data-tab="ret">Returns</button>
   <button data-tab="cli">Clients</button>
   <button data-tab="pur">Purchase</button>
   <button data-tab="prod">Stock<span class="badge" id="lowBadge" hidden></span></button>
@@ -279,6 +280,41 @@ main .tbl table{min-width:600px}
     <div class="tbl"><table>
       <thead><tr><th>Date</th><th>Client</th><th>Against</th><th class="n">Amount</th><th>Mode</th><th>Received by</th><th></th></tr></thead>
       <tbody id="payRows"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- RETURNS -->
+<section id="ret">
+  <div class="card">
+    <h2>Goods returned by client</h2>
+    <div class="grid">
+      <div><label for="tDate">Date</label><input type="date" id="tDate"></div>
+      <div><label for="tClient">Client name</label><input id="tClient" list="dlClients" placeholder="Pick a client"></div>
+      <div><label for="tCompany">Company</label><select id="tCompany"></select></div>
+      <div><label for="tChallan">Against challan</label><select id="tChallan"></select></div>
+      <div><label for="tReason">Reason</label><select id="tReason">
+        <option>Wrong size</option><option>Defective</option><option>Extra material</option><option>Taken back (payment delayed)</option><option>Other</option></select></div>
+      <div><label for="tBy">Brought back by / via</label><input id="tBy" placeholder="e.g. Porter, Ramesh, client"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Items returned</h2>
+    <div class="tbl"><table class="items" style="min-width:720px">
+      <thead><tr><th style="width:52px">Sr. No.</th><th>Product</th><th class="n" style="width:90px">Qty back</th><th class="n" style="width:110px">Rate ₹</th><th style="width:170px">Condition</th><th class="n" style="width:110px">Amount ₹</th><th style="width:40px"></th></tr></thead>
+      <tbody id="retRows"></tbody>
+    </table></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost sm" id="btnAddRetRow">+ Add item</button><button class="btn ghost sm" id="btnScanRet">Scan barcode</button></div>
+    <div class="totals"><div class="tot paid"><span>Credit to client</span><b id="tTotal2">₹0.00</b></div></div>
+    <div style="margin-top:12px"><label for="tNote">Remarks</label><input id="tNote" placeholder="Optional"></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btnSaveRet">Save return &amp; print note</button><button class="btn ghost" id="btnSaveRetOnly">Save only</button><button class="btn ghost" id="btnClearRet">Clear</button></div>
+    <p class="hint">Good items go back into stock. Defective items are recorded but not added to stock. The amount is taken off the client's balance. A saved return cannot be changed.</p>
+  </div>
+  <div class="card">
+    <h2>Return notes</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>No.</th><th>Date</th><th>Client</th><th>Against</th><th>Reason</th><th>Items</th><th class="n">Credit</th><th></th></tr></thead>
+      <tbody id="retList"></tbody>
     </table></div>
   </div>
 </section>
@@ -423,6 +459,7 @@ main .tbl table{min-width:600px}
           <option value="stock">Stock report</option>
           <option value="low">Low stock list</option>
           <option value="purchases">Purchase list</option>
+          <option value="returns">Goods return list</option>
         </select></div>
       <div id="rCliBox"><label for="rClient">Client</label><select id="rClient"></select></div>
       <div><label for="rCompany">Company</label><select id="rCompany"></select></div>
@@ -560,7 +597,7 @@ const CFG=window.PP_CONFIG||{};
 const ADMINS=(CFG.adminEmails||[]).map(key);
 function blankCo(id,name,prefix,email){return {id,name,addr:'',phone:'',email:email||'',gst:'',prefix};}
 function defaultCos(){return [blankCo(1,'PREMIER POOLS','PP/DC/','premierpools2016@gmail.com'),blankCo(2,'','B/DC/'),blankCo(3,'','C/DC/')];}
-let db={companies:defaultCos(),copies:'2',delPass:'',products:[],clients:[],challans:[],payments:[],purchases:[],trash:[]};
+let db={companies:defaultCos(),copies:'2',delPass:'',products:[],clients:[],challans:[],payments:[],purchases:[],returns:[],trash:[]};
 let fs=null,auth=null,me=null,isAdmin=false,myName='',subs=[];
 let activeCompany=+LS.get('pp_activeCompany',1)||1;
 const strip=o=>{const {_id,...rest}=o;return rest;};
@@ -573,7 +610,8 @@ const activeCos=()=>db.companies.filter(c=>(c.name||'').trim());
 const nextSeq=cid=>Math.max(0,...db.challans.filter(c=>c.companyId===+cid).map(c=>c.seq||0))+1;
 const fmtNo=(co,seq)=>co.prefix+String(seq).padStart(4,'0');
 const laterPaid=c=>db.payments.filter(p=>p.challanId===c.id).reduce((a,p)=>a+p.amount,0);
-const dueOf=c=>Math.max(0,r2(c.total-c.paid-laterPaid(c)));
+const retOf=c=>db.returns.filter(t=>t.challanId===c.id).reduce((a,t)=>a+t.total,0);
+const dueOf=c=>Math.max(0,r2(c.total-c.paid-laterPaid(c)-retOf(c)));
 const findClient=n=>db.clients.find(c=>key(c.name)===key(n));
 /* ---------- stock ---------- */
 const findProd=n=>db.products.find(p=>key(p.name)===key(n));
@@ -583,6 +621,7 @@ function stockMap(){
   const m={};db.products.forEach(p=>m[p._id]={opening:+p.opening||0,inQ:0,outQ:0});
   db.purchases.forEach(u=>u.items.forEach(it=>{const p=prodOf(it);if(p&&m[p._id])m[p._id].inQ+=+it.qty||0;}));
   db.challans.forEach(c=>c.items.forEach(it=>{const p=prodOf(it);if(p&&m[p._id])m[p._id].outQ+=+it.qty||0;}));
+  db.returns.forEach(t=>t.items.forEach(it=>{if(!it.good)return;const p=prodOf(it);if(p&&m[p._id])m[p._id].outQ-=+it.qty||0;}));
   Object.values(m).forEach(v=>v.stock=Math.round((v.opening+v.inQ-v.outQ)*1000)/1000);
   return m;
 }
@@ -600,8 +639,10 @@ function clientTotals(name,cid){
   const ch=db.challans.filter(c=>key(c.client)===key(name)&&(!cid||c.companyId===+cid));
   const py=db.payments.filter(p=>key(p.client)===key(name)&&(!cid||p.companyId===+cid));
   const purchases=ch.reduce((a,c)=>a+c.total,0);
+  const rt=db.returns.filter(t=>key(t.client)===key(name)&&(!cid||t.companyId===+cid));
   const paid=ch.reduce((a,c)=>a+c.paid,0)+py.reduce((a,p)=>a+p.amount,0);
-  return {ch,py,purchases:r2(purchases),paid:r2(paid),bal:r2(purchases-paid)};
+  const ret=rt.reduce((a,t)=>a+t.total,0);
+  return {ch,py,rt,purchases:r2(purchases),paid:r2(paid),ret:r2(ret),bal:r2(purchases-paid-ret)};
 }
 function clientPhone(name,fallback){return fallback||findClient(name)?.phone||'';}
 
@@ -619,6 +660,7 @@ function challanText(c){
   t+=c.items.map((it,i)=>`${i+1}. ${it.name} - ${it.qty} x ₹${num(it.price)} = ₹${num(it.qty*it.price)}`).join('\n');
   t+=`\n\n*Total: ₹${num(c.total)}*\nReceived at delivery: ₹${num(c.paid)}${c.paid>0?' ('+c.mode+')':''}`;
   if(later>0)t+=`\nReceived later: ₹${num(later)}`;
+  if(retOf(c)>0)t+=`\nGoods returned: ₹${num(retOf(c))}`;
   t+=`\n*Balance: ₹${num(due)}*`;
   t+=`\n\nDelivery: ${c.dMode||''}${c.dName?' - '+c.dName:''}${c.dMobile?' ('+c.dMobile+')':''}${c.dVeh?', Vehicle '+c.dVeh:''}`;
   const all=clientTotals(c.client,c.companyId).bal;
@@ -638,7 +680,7 @@ function go(tab){
   curTab=tab;
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.tab===tab));
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===tab));
-  ({hist:renderHist,pay:()=>{fillPayChallans();renderPays();},cli:()=>{$('cliLedger').hidden?renderCli():renderLedger();},prod:()=>{ensureCodes();renderProd();},pur:()=>{renderPurList();calcPur();},set:loadSet,rep:renderReport})[tab]?.();
+  ({hist:renderHist,pay:()=>{fillPayChallans();renderPays();},cli:()=>{$('cliLedger').hidden?renderCli():renderLedger();},prod:()=>{ensureCodes();renderProd();},pur:()=>{renderPurList();calcPur();},ret:()=>{renderRetList();if(!$('tChallan').options.length)fillRetChallans();},set:loadSet,rep:renderReport})[tab]?.();
   window.scrollTo(0,0);
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
@@ -654,7 +696,7 @@ function refreshLists(){
   $('dlProducts').innerHTML=db.products.map(p=>`<option value="${esc(p.name)}">`).join('');
   const r=[...new Set([...db.challans.map(c=>c.recv),...db.payments.map(p=>p.recv)].filter(Boolean))];
   $('dlRecv').innerHTML=r.map(x=>`<option value="${esc(x)}">`).join('');
-  coOptions($('cCompany'));coOptions($('yCompany'));coOptions($('hCompany'),true);coOptions($('lgCompany'),true);
+  coOptions($('cCompany'));coOptions($('yCompany'));coOptions($('tCompany'));coOptions($('hCompany'),true);coOptions($('lgCompany'),true);
   if([...$('cCompany').options].some(o=>o.value==activeCompany))$('cCompany').value=activeCompany;
   $('hName').textContent=coById($('cCompany').value).name||'PREMIER POOLS';
 }
@@ -847,6 +889,7 @@ function challanHTML(c,copyLabel,compact){
   <div class="pay"><div><table>
     <tr><td>Received at delivery</td><td style="text-align:right"><strong>₹ ${num(c.paid)}</strong></td></tr>
     ${later>0?`<tr><td>Received later</td><td style="text-align:right"><strong>₹ ${num(later)}</strong></td></tr>`:''}
+    ${retOf(c)>0?`<tr><td>Goods returned</td><td style="text-align:right"><strong>₹ ${num(retOf(c))}</strong></td></tr>`:''}
     <tr><td>Remaining balance</td><td style="text-align:right"><strong>₹ ${num(dueOf(c))}</strong></td></tr></table></div>
     <div><table><tr><td>Mode of payment</td><td><strong>${esc(c.mode)}</strong></td></tr>
     ${c.ref?`<tr><td>${c.mode==='Cheque'?'Cheque no.':'Txn ID'}</td><td>${esc(c.ref)}</td></tr>`:''}
@@ -879,13 +922,14 @@ function renderHist(){
   $('histRows').innerHTML=list.length?list.map(c=>{const d=dueOf(c);return `<tr><td class="cno">${esc(c.no)}</td><td>${fmtDate(c.date)}${c.byName?'<br><span class="hint">by '+esc(c.byName)+'</span>':''}</td><td>${esc(c.client)}</td>
     <td class="n money">${inr(c.total)}</td><td class="n"><span class="pill ${d>0?'due':'clear'}">${d>0?inr(d):'Paid'}</span></td>
     <td>${esc(c.dMode||'')}${c.dName?'<br><span class="hint">'+esc(c.dName)+' · '+esc(c.dMobile)+'</span>':''}</td>
-    <td><div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-w="${c.id}">WhatsApp</button><button class="btn sm" data-p="${c.id}">Reprint</button>${d>0?`<button class="btn ghost sm" data-y="${c.id}">Payment</button>`:''}</div></td></tr>`}).join('')
+    <td><div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-w="${c.id}">WhatsApp</button><button class="btn sm" data-p="${c.id}">Reprint</button>${d>0?`<button class="btn ghost sm" data-y="${c.id}">Payment</button>`:''}<button class="btn ghost sm" data-r="${c.id}">Return</button></div></td></tr>`}).join('')
     :'<tr><td colspan="7" class="hint">No challans yet. Saved challans appear here, locked.</td></tr>';
 }
 $('hSearch').oninput=renderHist;$('hCompany').onchange=renderHist;
 function challanActions(e){
   const b=e.target.closest('button');if(!b)return;
-  const c=db.challans.find(x=>x.id===+(b.dataset.w||b.dataset.p||b.dataset.y));if(!c)return;
+  const c=db.challans.find(x=>x.id===+(b.dataset.w||b.dataset.p||b.dataset.y||b.dataset.r));if(!c)return;
+  if(b.dataset.r)return startReturn(c);
   if(b.dataset.w)waOpen(clientPhone(c.client,c.phone),challanText(c));
   if(b.dataset.p)printChallan(c);
   if(b.dataset.y)startPayment(c.client,c);
@@ -974,6 +1018,7 @@ function ledgerRows(n,cid){
   t.ch.forEach(c=>{rows.push({date:c.date,ord:c.id,type:'ch',c,dr:c.total,cr:0});
     if(c.paid>0)rows.push({date:c.date,ord:c.id+0.5,type:'adv',c,dr:0,cr:c.paid});});
   t.py.forEach(p=>rows.push({date:p.date,ord:p.id,type:'pay',p,dr:0,cr:p.amount}));
+  t.rt.forEach(x=>rows.push({date:x.date,ord:x.id,type:'ret',t:x,dr:0,cr:x.total}));
   rows.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.ord-b.ord);
   let bal=0;rows.forEach(r=>{bal=r2(bal+r.dr-r.cr);r.bal=bal;});
   return {t,rows};
@@ -982,6 +1027,7 @@ function rowDetail(r,plain){
   const multi=activeCos().length>1&&!$('lgCompany').value;
   if(r.type==='ch'){const co=r.c.co||coById(r.c.companyId);
     return `Challan <span class="cno">${esc(r.c.no)}</span>${multi?' · '+esc(co.name):''}`+(plain?'':`<br><span class="hint">${r.c.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</span>`);}
+  if(r.type==='ret')return `Goods returned · ${plain?r.t.no:'<span class="cno">'+esc(r.t.no)+'</span>'} · ${esc(r.t.reason)}`+(plain?'':`<br><span class="hint">${r.t.items.map(i=>esc(i.name)+' × '+i.qty+(i.good?'':' (defective)')).join(', ')}</span>`);
   if(r.type==='adv')return `Paid at delivery · ${esc(r.c.mode)}${r.c.ref?' ('+esc(r.c.ref)+')':''}${r.c.recv?' · recd. by '+esc(r.c.recv):''}`;
   const ch=db.challans.find(c=>c.id===r.p.challanId);
   return `Payment · ${esc(r.p.mode)}${r.p.ref?' ('+esc(r.p.ref)+')':''} · ${ch?'for '+esc(ch.no):'on account'}${r.p.recv?' · recd. by '+esc(r.p.recv):''}`;
@@ -989,15 +1035,16 @@ function rowDetail(r,plain){
 function renderLedger(){
   if(!ledName)return;
   const {t,rows}=ledgerRows(ledName,$('lgCompany').value);
-  $('lgSum').innerHTML=`<div class="tot"><span>Total purchases</span><b>${inr(t.purchases)}</b></div><div class="tot paid"><span>Total paid</span><b>${inr(t.paid)}</b></div>
+  $('lgSum').innerHTML=`<div class="tot"><span>Total purchases</span><b>${inr(t.purchases)}</b></div><div class="tot paid"><span>Total paid</span><b>${inr(t.paid)}</b></div>${t.ret?`<div class="tot paid"><span>Goods returned</span><b>${inr(t.ret)}</b></div>`:''}
     <div class="tot due"><span>Balance due</span><b>${inr(t.bal)}</b></div><div class="tot"><span>Challans</span><b>${t.ch.length}</b></div>`;
   $('lgRows').innerHTML=rows.length?rows.map(r=>`<tr class="${r.type==='ch'?'lg-ch':''}"><td>${fmtDate(r.date)}</td><td>${rowDetail(r)}</td>
     <td class="n money">${r.dr?num(r.dr):''}</td><td class="n money" style="color:var(--ok)">${r.cr?num(r.cr):''}</td><td class="n money">${num(r.bal)}</td>
     <td>${r.type==='ch'?`<div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-w="${r.c.id}">WhatsApp</button><button class="btn ghost sm" data-p="${r.c.id}">Print</button></div>`
-      :r.type==='pay'?`<div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-pw="${r.p.id}">WhatsApp</button><button class="btn ghost sm" data-pp="${r.p.id}">Receipt</button></div>`:''}</td></tr>`).join('')
+      :r.type==='pay'?`<div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-pw="${r.p.id}">WhatsApp</button><button class="btn ghost sm" data-pp="${r.p.id}">Receipt</button></div>`
+      :r.type==='ret'?`<div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-tw="${r.t.id}">WhatsApp</button><button class="btn ghost sm" data-tp="${r.t.id}">Print</button></div>`:''}</td></tr>`).join('')
     :'<tr><td colspan="6" class="hint">No challans or payments for this client yet.</td></tr>';
 }
-$('lgRows').onclick=e=>{const b=e.target.closest('button');if(!b)return;(b.dataset.pw||b.dataset.pp)?payActions(e):challanActions(e);};
+$('lgRows').onclick=e=>{const b=e.target.closest('button');if(!b)return;(b.dataset.tw||b.dataset.tp)?retActions(e):(b.dataset.pw||b.dataset.pp)?payActions(e):challanActions(e);};
 $('lgCompany').onchange=renderLedger;
 $('lgBack').onclick=()=>{ledName=null;$('cliLedger').hidden=true;$('cliList').hidden=false;renderCli();};
 $('lgPhone').onchange=$('lgAddr').onchange=()=>{
@@ -1161,6 +1208,108 @@ $('purList').onclick=e=>{const b=e.target.closest('[data-pdel]');if(!b||!isAdmin
   if(b.dataset.sure){write(fs.collection('purchases').doc(b.dataset.pdel).delete());toast('Purchase deleted. Stock reduced.');}
   else{b.dataset.sure=1;b.textContent='Tap again to delete';setTimeout(()=>{if(b.isConnected){b.textContent='Delete';delete b.dataset.sure;}},4000);}};
 
+/* ---------- returns ---------- */
+const returnedQty=(c,name)=>db.returns.filter(t=>t.challanId===c.id).reduce((a,t)=>a+t.items.filter(i=>key(i.name)===key(name)).reduce((x,i)=>x+i.qty,0),0);
+function addRetRow(it={}){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="sr"></td>
+    <td><div class="namecell"><input class="iName" list="dlProducts" value="${esc(it.name||'')}" placeholder="Product or barcode"><button class="btn ghost sm iScan" type="button" aria-label="Scan barcode">Scan</button></div><div class="stk">${it.max!=null?`Sold ${it.sold}, can return up to ${it.max}`:''}</div></td>
+    <td><input class="iQty" type="number" min="0" step="any" value="${it.qty??0}" ${it.max!=null?`max="${it.max}"`:''} data-max="${it.max??''}" style="text-align:right"></td>
+    <td><input class="iRate" type="number" min="0" step="0.01" value="${it.price??''}" style="text-align:right"></td>
+    <td><select class="iGood"><option value="1">Good: back to stock</option><option value="0">Defective: not in stock</option></select></td>
+    <td class="n iAmt">0.00</td>
+    <td><button class="btn danger sm iDel" aria-label="Remove item">✕</button></td>`;
+  const nm=tr.querySelector('.iName');
+  if($('tReason').value==='Defective')tr.querySelector('.iGood').value='0';
+  nm.addEventListener('change',()=>{const p=findCode(nm.value);if(p)nm.value=p.name;const q=findProd(nm.value);if(q&&!tr.querySelector('.iRate').value)tr.querySelector('.iRate').value=q.price;calcRet();});
+  tr.querySelector('.iScan').onclick=()=>openScan(code=>{const p=findCode(code)||findProd(code);if(!p)return toast('No product has code '+code);nm.value=p.name;if(!tr.querySelector('.iRate').value)tr.querySelector('.iRate').value=p.price;calcRet();});
+  tr.querySelector('.iDel').onclick=()=>{tr.remove();if(!$('retRows').children.length)addRetRow();calcRet();};
+  tr.addEventListener('input',calcRet);tr.addEventListener('change',calcRet);
+  $('retRows').appendChild(tr);calcRet();
+}
+function calcRet(){let t=0;
+  [...$('retRows').children].forEach((tr,i)=>{tr.querySelector('.sr').textContent=i+1;
+    const a=(+tr.querySelector('.iQty').value||0)*(+tr.querySelector('.iRate').value||0);tr.querySelector('.iAmt').textContent=num(a);t+=a;});
+  $('tTotal2').textContent=inr(t);return r2(t);}
+function fillRetChallans(selId){
+  const n=$('tClient').value.trim(),cid=+$('tCompany').value;
+  const list=db.challans.filter(c=>key(c.client)===key(n)&&c.companyId===cid).sort((a,b)=>b.id-a.id);
+  $('tChallan').innerHTML='<option value="">Not against a challan</option>'+list.map(c=>`<option value="${c.id}">${esc(c.no)} · ${fmtDate(c.date)} · ${inr(c.total)}</option>`).join('');
+  if(selId)$('tChallan').value=selId;
+}
+function loadChallanItems(){
+  const c=db.challans.find(x=>x.id===+$('tChallan').value);
+  $('retRows').innerHTML='';
+  if(!c){addRetRow();return;}
+  c.items.forEach(it=>{const back=returnedQty(c,it.name),max=Math.max(0,Math.round((it.qty-back)*1000)/1000);
+    if(max>0)addRetRow({name:it.name,qty:0,price:it.price,sold:it.qty,max});});
+  if(!$('retRows').children.length){addRetRow();toast('All items of this challan were already returned');}
+}
+function startReturn(c){go('ret');$('tClient').value=c.client;$('tCompany').value=c.companyId;fillRetChallans(c.id);loadChallanItems();}
+function resetRet(){$('tDate').value=today();['tClient','tBy','tNote'].forEach(i=>$(i).value='');$('tReason').value='Wrong size';fillRetChallans();$('retRows').innerHTML='';addRetRow();}
+$('tClient').addEventListener('change',()=>{fillRetChallans();loadChallanItems();});
+$('tCompany').onchange=()=>{fillRetChallans();loadChallanItems();};
+$('tChallan').onchange=loadChallanItems;
+$('tReason').onchange=()=>{const d=$('tReason').value==='Defective';[...$('retRows').querySelectorAll('.iGood')].forEach(s=>s.value=d?'0':'1');};
+$('btnAddRetRow').onclick=()=>addRetRow();
+$('btnScanRet').onclick=()=>openScan(code=>{const p=findCode(code)||findProd(code);if(!p)return toast('No product has code '+code);
+  const row=[...$('retRows').children].find(tr=>key(tr.querySelector('.iName').value)===key(p.name));
+  if(row){const q=row.querySelector('.iQty');q.value=(+q.value||0)+1;calcRet();return toast(p.name+': '+q.value);}
+  const empty=[...$('retRows').children].find(tr=>!tr.querySelector('.iName').value.trim());
+  if(empty){empty.querySelector('.iName').value=p.name;empty.querySelector('.iQty').value=1;empty.querySelector('.iRate').value=p.price;calcRet();}
+  else addRetRow({name:p.name,qty:1,price:p.price});});
+$('btnClearRet').onclick=resetRet;
+async function saveReturn(print,btn){
+  const n=$('tClient').value.trim();
+  if(!n)return toast('Pick the client');
+  const items=[...$('retRows').children].map(tr=>{const name=tr.querySelector('.iName').value.trim();const p=findProd(name);
+    const o={name,qty:+tr.querySelector('.iQty').value||0,price:+tr.querySelector('.iRate').value||0,good:tr.querySelector('.iGood').value==='1',max:tr.querySelector('.iQty').dataset.max};
+    if(p)o.pid=p._id;return o;}).filter(i=>i.name&&i.qty>0);
+  if(!items.length)return toast('Enter the quantity that came back');
+  const over=items.find(i=>i.max!==''&&i.qty>+i.max);if(over)return toast(`${over.name}: only ${over.max} can be returned against this challan`);
+  if(!navigator.onLine)return toast('Connect to the internet to save a return');
+  if(!confirmTap(btn))return;
+  items.forEach(i=>delete i.max);
+  const ch=db.challans.find(x=>x.id===+$('tChallan').value);
+  const t={id:Date.now(),date:$('tDate').value||today(),client:(findClient(n)||{name:n}).name,companyId:+$('tCompany').value,challanId:ch?ch.id:null,challanNo:ch?ch.no:'',
+    reason:$('tReason').value,via:$('tBy').value.trim(),note:$('tNote').value.trim(),items,total:calcRet(),by:me.uid,byName:myName,savedAt:Date.now()};
+  btn.disabled=true;
+  try{
+    const ref=fs.collection('counters').doc('ret');
+    const doc=await withTimeout(fs.runTransaction(async tx=>{const cs=await tx.get(ref);let seq=(cs.exists?cs.data().seq||0:0)+1;
+      const local=Math.max(0,...db.returns.map(x=>x.seq||0));if(seq<=local)seq=local+1;
+      const d={...t,seq,no:'RN/'+String(seq).padStart(4,'0')};tx.set(ref,{seq});tx.set(fs.collection('returns').doc('ret_'+seq),d);return d;}),20000);
+    addNewProducts(items,'price');
+    resetRet();toast('Return saved: '+doc.no);if(print)printReturn(doc);
+  }catch(e){fail(e);}finally{btn.disabled=false;}
+}
+$('btnSaveRet').onclick=()=>saveReturn(true,$('btnSaveRet'));
+$('btnSaveRetOnly').onclick=()=>saveReturn(false,$('btnSaveRetOnly'));
+function retText(t){const co=coById(t.companyId);const bal=clientTotals(t.client,t.companyId).bal;
+  return `*${co.name}*\nGoods Return Note *${t.no}*\nDate: ${fmtDate(t.date)}\nClient: ${t.client}${t.challanNo?'\nAgainst challan: '+t.challanNo:''}\nReason: ${t.reason}\n\n`+
+  t.items.map((i,k)=>`${k+1}. ${i.name} - ${i.qty} x ₹${num(i.price)} = ₹${num(i.qty*i.price)}${i.good?'':' (defective)'}`).join('\n')+
+  `\n\n*Credit: ₹${num(t.total)}*\n*Your balance now: ₹${num(bal)}*\n\nThank you,\n${co.name}`;}
+function printReturn(t){const co=coById(t.companyId);const bal=clientTotals(t.client,t.companyId).bal;
+  const one=lab=>`<div class="pc cmp"><div class="copy">${lab}</div>${coHead(co,'GOODS RETURN NOTE',`No: <strong>${esc(t.no)}</strong><br>Date: ${fmtDate(t.date)}`)}
+  <div class="meta"><div><strong>From:</strong> ${esc(t.client)}${t.challanNo?'<br>Against challan: '+esc(t.challanNo):''}</div>
+  <div><strong>Reason:</strong> ${esc(t.reason)}${t.via?'<br>Brought by: '+esc(t.via):''}${t.note?'<br>Remarks: '+esc(t.note):''}</div></div>
+  <table><thead><tr><th style="width:9%">Sr. No.</th><th>Product</th><th style="width:10%;text-align:right">Qty</th><th style="width:14%;text-align:right">Rate ₹</th><th style="width:14%">Condition</th><th style="width:16%;text-align:right">Amount ₹</th></tr></thead>
+  <tbody>${t.items.map((i,k)=>`<tr><td style="text-align:center">${k+1}</td><td>${esc(i.name)}</td><td style="text-align:right">${i.qty}</td><td style="text-align:right">${num(i.price)}</td><td>${i.good?'Good':'Defective'}</td><td style="text-align:right">${num(i.qty*i.price)}</td></tr>`).join('')}
+  <tr><td colspan="5" style="text-align:right"><strong>Credit to client</strong></td><td style="text-align:right"><strong>${num(t.total)}</strong></td></tr>
+  <tr><td colspan="5" style="text-align:right">Client balance after this return</td><td style="text-align:right">${num(bal)}</td></tr></tbody></table>
+  <div class="sig"><div>Client's signature</div><div>For ${esc(co.name)}</div></div></div>`;
+  doPrint(db.copies==='2'&&t.items.length<=8?`<div class="half">${one('ORIGINAL')}</div><div class="cut"><span>✂ CUT HERE</span></div><div class="half">${one('DUPLICATE')}</div>`:one(''));}
+function renderRetList(){
+  coOptions($('tCompany'));
+  $('retList').innerHTML=db.returns.length?db.returns.map(t=>`<tr><td class="cno">${esc(t.no)}</td><td>${fmtDate(t.date)}</td><td>${esc(t.client)}</td><td class="cno">${esc(t.challanNo||'-')}</td><td>${esc(t.reason)}</td>
+    <td>${t.items.map(i=>esc(i.name)+' × '+i.qty+(i.good?'':' (def.)')).join(', ')}</td><td class="n money">${inr(t.total)}</td>
+    <td><div class="row" style="flex-wrap:nowrap"><button class="btn wa sm" data-tw="${t.id}">WhatsApp</button><button class="btn ghost sm" data-tp="${t.id}">Print</button></div></td></tr>`).join('')
+    :'<tr><td colspan="8" class="hint">No returns yet. In Challans, tap Return on a challan, or fill the form above.</td></tr>';
+}
+function retActions(e){const b=e.target.closest('button');if(!b)return;const t=db.returns.find(x=>x.id===+(b.dataset.tw||b.dataset.tp));if(!t)return;
+  if(b.dataset.tw)waOpen(clientPhone(t.client),retText(t));if(b.dataset.tp)printReturn(t);}
+$('retList').onclick=retActions;
+
 /* ---------- settings ---------- */
 const coFields=[['name','Company name'],['phone','Phone'],['email','Email'],['gst','GSTIN'],['addr','Address'],['prefix','Challan no. prefix']];
 function loadSet(){
@@ -1183,13 +1332,13 @@ $('btnSaveSet').onclick=()=>{
   write(settingsRef().set({companies:cos,copies:$('sCopies').value},{merge:true}));toast('Settings saved');
 };
 function backupData(){return {exportedAt:new Date().toISOString(),companies:db.companies,copies:db.copies,
-  products:db.products.map(strip),clients:db.clients.map(strip),challans:db.challans.map(strip),payments:db.payments.map(strip),purchases:db.purchases.map(strip)};}
+  products:db.products.map(strip),clients:db.clients.map(strip),challans:db.challans.map(strip),payments:db.payments.map(strip),purchases:db.purchases.map(strip),returns:db.returns.map(strip)};}
 $('btnExport').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(backupData(),null,1)],{type:'application/json'}));
   a.download='premier-pools-backup-'+today()+'.json';a.click();toast('Backup downloaded');};
 
 /* old single-phone backups use another shape; bring them to this one */
 function migrate(d){
-  d.products=d.products||[];d.clients=d.clients||[];d.challans=d.challans||[];d.payments=d.payments||[];d.purchases=d.purchases||[];
+  d.products=d.products||[];d.clients=d.clients||[];d.challans=d.challans||[];d.payments=d.payments||[];d.purchases=d.purchases||[];d.returns=d.returns||[];
   if(!d.companies&&d.settings){const s=d.settings;d.companies=defaultCos();Object.assign(d.companies[0],{name:s.name||'PREMIER POOLS',addr:s.addr||'',phone:s.phone||'',email:s.email||d.companies[0].email,gst:s.gst||'',prefix:s.prefix||'PP/DC/'});d.copies=s.copies||'2';}
   d.challans.forEach(c=>{if(!c.companyId)c.companyId=1;if(!c.seq){const m=String(c.no).match(/(\d+)\s*$/);c.seq=m?+m[1]:0;}c.paid=+c.paid||0;});
   return d;
@@ -1204,6 +1353,8 @@ async function importData(d,label){
     const doc={...strip(c),by:c.by||me.uid,byName:c.byName||myName};ops.push(b=>b.set(fs.collection('challans').doc(id),doc));});
   d.payments.forEach(p=>{const id=String(p.id);if(pIds.has(id))return;pIds.add(id);
     const doc={...strip(p),by:p.by||me.uid,byName:p.byName||myName};ops.push(b=>b.set(fs.collection('payments').doc(id),doc));});
+  const rIds=new Set(db.returns.map(x=>x._id));
+  d.returns.forEach(x=>{const id='ret_'+x.seq;if(rIds.has(id))return;rIds.add(id);ops.push(b=>b.set(fs.collection('returns').doc(id),strip(x)));});
   const uIds=new Set(db.purchases.map(u=>u._id));
   d.purchases.forEach(u=>{const id=String(u.id);if(uIds.has(id))return;uIds.add(id);ops.push(b=>b.set(fs.collection('purchases').doc(id),{...strip(u),by:u.by||me.uid,byName:u.byName||myName}));});
   d.clients.forEach(c=>{if(cl.has(key(c.name)))return;cl.add(key(c.name));ops.push(b=>b.set(fs.collection('clients').doc(),strip(c)));});
@@ -1231,7 +1382,7 @@ function pwUI(){
   $('pwOldBox').hidden=!has;$('btnPw').textContent=has?'Change password':'Set password';
   const tr=db.trash;$('trashBox').hidden=!tr.length;
   if(tr.length){const n=c=>tr.filter(t=>t.col===c).length;
-    $('trashInfo').textContent=`Deleted on ${new Date(Math.max(...tr.map(t=>t.at))).toLocaleString('en-IN')}: ${n('challans')} challans, ${n('payments')} payments, ${n('clients')} clients, ${n('products')} products, ${n('purchases')} purchases.`;}
+    $('trashInfo').textContent=`Deleted on ${new Date(Math.max(...tr.map(t=>t.at))).toLocaleString('en-IN')}: ${n('challans')} challans, ${n('payments')} payments, ${n('clients')} clients, ${n('products')} products, ${n('purchases')} purchases, ${n('returns')} returns.`;}
 }
 $('btnPw').onclick=()=>{
   if(db.delPass&&hashPw($('pwOld').value)!==db.delPass)return toast('Current password is wrong');
@@ -1246,7 +1397,7 @@ $('btnWipe').onclick=async()=>{
   if(!db.delPass)return toast('Set a delete password first');
   if(hashPw($('wPass').value)!==db.delPass)return toast('Wrong password. Nothing was deleted');
   if($('wWord').value.trim().toUpperCase()!=='DELETE')return toast('Type DELETE in the box to confirm');
-  const cols=['challans','payments','clients','products','purchases'];
+  const cols=['challans','payments','clients','products','purchases','returns'];
   if(!cols.some(c=>db[c].length))return toast('There is no data to delete');
   if(!navigator.onLine)return toast('Connect to the internet to delete');
   busy=true;toast('Deleting…');
@@ -1268,7 +1419,7 @@ $('btnUndo').onclick=async()=>{
   if(!navigator.onLine)return toast('Connect to the internet to restore');
   busy=true;
   try{
-    const live={challans:new Set(db.challans.map(c=>c._id)),payments:new Set(db.payments.map(p=>p._id)),purchases:new Set(db.purchases.map(u=>u._id))};
+    const live={challans:new Set(db.challans.map(c=>c._id)),payments:new Set(db.payments.map(p=>p._id)),purchases:new Set(db.purchases.map(u=>u._id)),returns:new Set(db.returns.map(x=>x._id))};
     const names={clients:new Set(db.clients.map(c=>key(c.name))),products:new Set(db.products.map(p=>key(p.name)))};
     const ops=[];let clash=0;
     db.trash.forEach(t=>{
@@ -1292,12 +1443,12 @@ function buildReport(){
   const R={type,num:[],rows:[],foot:null};
   if(type==='clients'){
     R.title='Client list';R.sub=`${repCos()} · as of ${fmtDate(today())}`;
-    R.head=['Sr.','Client','Mobile','Address','Challans','Purchases (Rs)','Paid (Rs)','Balance (Rs)'];R.num=[5,6,7];
-    let P=0,Y=0,B=0,N=0;
+    R.head=['Sr.','Client','Mobile','Address','Challans','Purchases (Rs)','Paid (Rs)','Returned (Rs)','Balance (Rs)'];R.num=[5,6,7,8];
+    let P=0,Y=0,B=0,N=0,RT=0;
     allClientNames().forEach((n,i)=>{const tt=clientTotals(n,cid);const c=findClient(n)||{};
-      if(cid&&!tt.ch.length&&!tt.py.length)return;
-      R.rows.push([R.rows.length+1,n,c.phone||'',c.addr||'',tt.ch.length,tt.purchases,tt.paid,tt.bal]);N+=tt.ch.length;P+=tt.purchases;Y+=tt.paid;B+=tt.bal;});
-    R.foot=['','Total','','',N,r2(P),r2(Y),r2(B)];
+      if(cid&&!tt.ch.length&&!tt.py.length&&!tt.rt.length)return;
+      R.rows.push([R.rows.length+1,n,c.phone||'',c.addr||'',tt.ch.length,tt.purchases,tt.paid,tt.ret,tt.bal]);N+=tt.ch.length;P+=tt.purchases;Y+=tt.paid;RT+=tt.ret;B+=tt.bal;});
+    R.foot=['','Total','','',N,r2(P),r2(Y),r2(RT),r2(B)];
   }
   if(type==='challans'){
     R.title='Challan list';R.sub=`${repCos()} · ${periodText()}`;
@@ -1347,6 +1498,13 @@ function buildReport(){
     db.products.forEach(p=>{const v=STK[p._id]||{opening:0,inQ:0,outQ:0,stock:0},lw=isLow(p,v.stock);if(type==='low'&&!lw)return;
       R.rows.push([R.rows.length+1,p.code||'',p.name,p.unit||'',v.opening,v.inQ,v.outQ,v.stock,+p.min||0,v.stock<0?'NEGATIVE':lw?'LOW':'OK']);});
     R.foot=['','',`${R.rows.length} product${R.rows.length===1?'':'s'}`,'','','','','','',''];
+  }
+  if(type==='returns'){
+    R.title='Goods return list';R.sub=`${repCos()} · ${periodText()}`;
+    R.head=['Sr.','Return no.','Date','Client','Against challan','Reason','Items','Credit (Rs)'];R.num=[7];
+    let T=0;db.returns.filter(x=>(!cid||x.companyId===+cid)&&inRange(x.date,f,t)).slice().reverse().forEach(x=>{T+=x.total;
+      R.rows.push([R.rows.length+1,x.no,fmtDate(x.date),x.client,x.challanNo||'',x.reason,x.items.map(i=>i.name+' x '+i.qty+(i.good?'':' (defective)')).join(', '),x.total]);});
+    R.foot=['','',`${R.rows.length} return${R.rows.length===1?'':'s'}`,'','','','',r2(T)];
   }
   if(type==='purchases'){
     R.title='Purchase list';R.sub=`All companies · ${periodText()}`;
@@ -1441,6 +1599,7 @@ function onData(col){
   if(curTab==='cli'){$('cliLedger').hidden?renderCli():renderLedger();}
   if(curTab==='prod'&&!$('prod').contains(document.activeElement))renderProd();
   if(curTab==='pur'){renderPurList();calcPur();}
+  if(curTab==='ret'&&col==='returns')renderRetList();
   if(curTab==='new'&&$('pv').hidden)calc();
   if(curTab==='set'&&col==='trash')pwUI();
   if(curTab==='rep'&&col!=='trash')renderReport();
@@ -1450,12 +1609,12 @@ function listenErr(e){console.error(e);if(e.code==='permission-denied')toast('Yo
 function listen(){
   subs.push(settingsRef().onSnapshot(d=>{const v=d.exists?d.data():{};
     if(Array.isArray(v.companies)&&v.companies.length)db.companies=v.companies;db.copies=v.copies||'2';db.delPass=v.delPass||'';onData('settings');},listenErr));
-  const order={purchases:(a,b)=>(b.date<a.date?-1:b.date>a.date?1:b.id-a.id),challans:(a,b)=>(b.savedAt||b.id)-(a.savedAt||a.id),payments:(a,b)=>b.id-a.id,clients:(a,b)=>a.name.localeCompare(b.name),products:(a,b)=>a.name.localeCompare(b.name)};
+  const order={returns:(a,b)=>(b.savedAt||b.id)-(a.savedAt||a.id),purchases:(a,b)=>(b.date<a.date?-1:b.date>a.date?1:b.id-a.id),challans:(a,b)=>(b.savedAt||b.id)-(a.savedAt||a.id),payments:(a,b)=>b.id-a.id,clients:(a,b)=>a.name.localeCompare(b.name),products:(a,b)=>a.name.localeCompare(b.name)};
   Object.keys(order).forEach(col=>subs.push(fs.collection(col).onSnapshot(s=>{
     db[col]=s.docs.map(d=>({...d.data(),_id:d.id})).sort(order[col]);onData(col);},listenErr)));
   if(isAdmin)subs.push(fs.collection('trash').onSnapshot(s=>{db.trash=s.docs.map(d=>({...d.data(),_id:d.id}));onData('trash');},listenErr));
 }
-function stopListening(){subs.forEach(u=>u());subs=[];db={...db,products:[],clients:[],challans:[],payments:[],purchases:[],trash:[]};}
+function stopListening(){subs.forEach(u=>u());subs=[];db={...db,products:[],clients:[],challans:[],payments:[],purchases:[],returns:[],trash:[]};}
 
 /* ---------- sign in ---------- */
 function gate(view){['gLoad','gLogin','gName','gSetup'].forEach(id=>$(id).hidden=id!==view);$('gate').hidden=!view;}
@@ -1497,7 +1656,7 @@ async function startSession(u){
 /* ---------- start ---------- */
 function netUI(){$('net').hidden=navigator.onLine;}
 window.addEventListener('online',netUI);window.addEventListener('offline',netUI);netUI();
-$('yDate').value=today();refUI('yMode','yRefBox','yRefLbl');resetPur();
+$('yDate').value=today();refUI('yMode','yRefBox','yRefLbl');resetPur();resetRet();
 refreshLists();resetForm();
 const configured=CFG.firebase&&CFG.firebase.apiKey&&!/PASTE/i.test(CFG.firebase.apiKey)&&window.firebase;
 if(!configured)gate('gSetup');

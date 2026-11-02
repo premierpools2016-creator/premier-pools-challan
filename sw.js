@@ -1,5 +1,5 @@
 // Keeps the app working without internet. Bump VERSION after uploading changes.
-const VERSION = 'pp-challan-v3';
+const VERSION = 'pp-challan-v4';
 const SHELL = ['./', './index.html', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -41,6 +41,13 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isOwner();
     }
+    // Goods returned by clients (Return Notes). Permanent; only the owner can delete.
+    match /returns/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (request.resource.data.by == request.auth.uid || isOwner());
+      allow update: if false;
+      allow delete: if isOwner();
+    }
     match /clients/{id} {
       allow read, create, update: if signedIn();
       allow delete: if isOwner();
