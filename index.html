@@ -212,9 +212,9 @@ main .tbl table{min-width:600px}
     <div class="grid">
       <div><label for="dMode">Mode of delivery</label>
         <select id="dMode"><option>Take Away</option><option>Porter</option><option>Rickshaw</option><option>Delivery by Self</option><option>Delivery by Person</option></select></div>
-      <div id="dNameBox"><label for="dName" id="dNameLbl">Picked up by (name)</label><input id="dName"></div>
-      <div id="dMobBox"><label for="dMobile" id="dMobLbl">Mobile number</label><input id="dMobile" inputmode="tel" maxlength="15"></div>
-      <div id="vehBox"><label for="dVeh">Vehicle no.</label><input id="dVeh" placeholder="Optional"></div>
+      <div id="dNameBox"><label for="dName" id="dNameLbl">Picked up by (name)</label><input id="dName" list="dlDel" autocomplete="off" placeholder="Type or pick from list"></div>
+      <div id="dMobBox"><label for="dMobile" id="dMobLbl">Mobile number</label><input id="dMobile" list="dlDelMob" inputmode="tel" maxlength="15" autocomplete="off"></div>
+      <div id="vehBox"><label for="dVeh">Vehicle no.</label><input id="dVeh" list="dlVeh" autocomplete="off" placeholder="Optional"></div>
     </div>
   </div>
 
@@ -528,7 +528,7 @@ main .tbl table{min-width:600px}
 </section>
 </main>
 
-<datalist id="dlClients"></datalist><datalist id="dlVendors"></datalist><datalist id="dlProducts"></datalist><datalist id="dlRecv"></datalist>
+<datalist id="dlClients"></datalist><datalist id="dlDel"></datalist><datalist id="dlDelMob"></datalist><datalist id="dlVeh"></datalist><datalist id="dlVendors"></datalist><datalist id="dlProducts"></datalist><datalist id="dlRecv"></datalist>
 <div class="pv" id="pv" hidden role="dialog" aria-modal="true" aria-labelledby="pvTitle">
   <div class="pv-box">
     <h2 id="pvTitle" style="margin:0">Check the challan</h2>
@@ -692,6 +692,7 @@ function coOptions(sel,withAll){
   if([...sel.options].some(o=>o.value===cur))sel.value=cur;
 }
 function refreshLists(){
+  fillDelLists();
   $('dlClients').innerHTML=db.clients.map(c=>`<option value="${esc(c.name)}">`).join('');
   $('dlProducts').innerHTML=db.products.map(p=>`<option value="${esc(p.name)}">`).join('');
   const r=[...new Set([...db.challans.map(c=>c.recv),...db.payments.map(p=>p.recv)].filter(Boolean))];
@@ -712,7 +713,26 @@ function delivUI(){
   $('dMobLbl').textContent=m==='Take Away'?'Pickup person mobile':'Delivery person mobile';
   $('vehBox').hidden=m==='Take Away';
 }
-$('dMode').onchange=delivUI;
+$('dMode').onchange=()=>{delivUI();fillDelLists();};
+/* delivery people: learnt from saved challans, newest first; same delivery mode listed first */
+function delPeople(){
+  const m=new Map();
+  db.challans.forEach(c=>{if(!c.dName)return;const k=key(c.dName);const cur=m.get(k);
+    if(!cur||(c.savedAt||c.id)>cur.t)m.set(k,{name:c.dName,mobile:c.dMobile||'',mode:c.dMode,t:c.savedAt||c.id,veh:c.dVeh||''});});
+  return [...m.values()];
+}
+function fillDelLists(){
+  const mode=$('dMode').value;
+  const list=delPeople().sort((a,b)=>((b.mode===mode)-(a.mode===mode))||(b.t-a.t));
+  $('dlDel').innerHTML=list.map(x=>`<option value="${esc(x.name)}" label="${esc(x.mobile)} · ${esc(x.mode)}">`).join('');
+  $('dlDelMob').innerHTML=list.filter(x=>x.mobile).map(x=>`<option value="${esc(x.mobile)}" label="${esc(x.name)}">`).join('');
+  const vs=new Map();db.challans.forEach(c=>{if(c.dVeh&&!vs.has(key(c.dVeh)))vs.set(key(c.dVeh),c.dVeh);});
+  $('dlVeh').innerHTML=[...vs.values()].map(v=>`<option value="${esc(v)}">`).join('');
+}
+$('dName').addEventListener('change',()=>{const x=delPeople().find(p=>key(p.name)===key($('dName').value));
+  if(x){$('dName').value=x.name;if(x.mobile)$('dMobile').value=x.mobile;if(x.veh&&!$('vehBox').hidden&&!$('dVeh').value)$('dVeh').value=x.veh;}});
+$('dMobile').addEventListener('change',()=>{const d=$('dMobile').value.replace(/\D/g,'');if(!d)return;
+  const x=delPeople().find(p=>p.mobile.replace(/\D/g,'')===d);if(x&&!$('dName').value.trim())$('dName').value=x.name;});
 function addRow(it={}){
   const tr=document.createElement('tr');
   tr.innerHTML=`<td class="sr"></td>
