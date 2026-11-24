@@ -74,7 +74,7 @@ td.n,th.n{text-align:right}
 .tot.due b{color:var(--warn)}.tot.paid b{color:var(--ok)}
 .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.78rem;font-weight:600;background:var(--tile);white-space:nowrap}
 .pill.due{color:var(--warn)}.pill.clear{color:var(--ok)}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw;text-align:center}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
 .hint{font-size:.85rem;color:var(--muted)}
 .cno{font:500 .95rem var(--mono);white-space:nowrap}
@@ -468,7 +468,8 @@ main .tbl table{min-width:600px}
       <div id="rToBox"><label for="rTo">To date</label><input type="date" id="rTo"></div>
     </div>
     <div class="row" style="margin-top:12px">
-      <button class="btn" id="rXls">Download Excel</button>
+      <button class="btn" id="rView">View report</button>
+      <button class="btn ghost" id="rXls">Download Excel</button>
       <button class="btn ghost" id="rPdf">Download PDF</button>
       <button class="btn ghost" id="rPrint">Print</button>
     </div>
@@ -563,6 +564,18 @@ main .tbl table{min-width:600px}
       <button class="btn ghost" id="pvSave">Confirm &amp; save</button>
       <button class="btn danger" id="pvBack">← Back to edit</button>
     </div>
+  </div>
+</div>
+<div class="pv" id="rv" hidden role="dialog" aria-modal="true" aria-labelledby="rvTitle">
+  <div class="pv-box" style="max-width:1100px">
+    <div class="row" style="justify-content:space-between"><h2 id="rvTitle" style="margin:0">Report</h2><button class="btn ghost sm" id="rvClose">Close ✕</button></div>
+    <div class="row">
+      <button class="btn" id="rvPdf">Download PDF</button>
+      <button class="btn ghost" id="rvXls">Download Excel</button>
+      <button class="btn ghost" id="rvPrint">Print</button>
+    </div>
+    <p class="hint" style="margin:0" id="rvHint">Scroll sideways and down to see the whole report.</p>
+    <div class="pv-wrap" id="rvWrap" style="overflow:auto;max-height:70vh"><div id="rvPaper" style="background:#fff;color:#000;font:10pt/1.35 var(--body);padding:20px"></div></div>
   </div>
 </div>
 <div class="pv" id="vw" hidden role="dialog" aria-modal="true" aria-labelledby="vwTitle">
@@ -1741,15 +1754,36 @@ $('rPdf').onclick=()=>withLib($('rPdf'),[JSPDF_SRC,AUTOTABLE_SRC],async()=>{
   if(R.note){doc.setFontSize(8);doc.text(doc.splitTextToSize(R.note,doc.internal.pageSize.getWidth()-28),14,doc.lastAutoTable.finalY+6);}
   await saveReport(doc.output('blob'),fileName(R,'pdf'),R);
 });
-$('rPrint').onclick=()=>{
-  const R=buildReport();if(!R.rows.length)return toast('Nothing to print for these filters');
+function reportHTML(R){
   const co=$('rCompany').value?coById($('rCompany').value):coById(activeCompany);
   const fmt=(v,i)=>R.num.includes(i)&&typeof v==='number'?num(v):esc(v);
-  doPrint(`<div class="pc">${coHead(co,R.title.toUpperCase().slice(0,40),esc(R.sub))}
+  return `<div class="pc">${coHead(co,R.title.toUpperCase().slice(0,40),esc(R.sub))}
   <table><thead><tr>${R.head.map((h,i)=>`<th style="${R.num.includes(i)?'text-align:right':''}">${esc(h)}</th>`).join('')}</tr></thead>
   <tbody>${R.rows.map(r=>`<tr>${r.map((v,i)=>`<td style="${R.num.includes(i)?'text-align:right;':''}${isDue(R,i,v)?'color:#c81e1e!important;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact':''}">${fmt(v,i)}</td>`).join('')}</tr>`).join('')}</tbody>
-  ${R.foot?`<tfoot><tr>${R.foot.map((v,i)=>`<th style="${R.num.includes(i)?'text-align:right;':''}${isDue(R,i,v)?'color:#c81e1e!important;-webkit-print-color-adjust:exact;print-color-adjust:exact':''}">${fmt(v,i)}</th>`).join('')}</tr></tfoot>`:''}</table></div>`);
+  ${R.foot?`<tfoot><tr>${R.foot.map((v,i)=>`<th style="${R.num.includes(i)?'text-align:right;':''}${isDue(R,i,v)?'color:#c81e1e!important;-webkit-print-color-adjust:exact;print-color-adjust:exact':''}">${fmt(v,i)}</th>`).join('')}</tr></tfoot>`:''}</table>${R.note?`<p style="font-size:8.5pt;padding:4px 8px;margin:0">${esc(R.note)}</p>`:''}</div>`;
+}
+$('rPrint').onclick=()=>{
+  const R=buildReport();if(!R.rows.length)return toast('Nothing to print for these filters');
+  doPrint(reportHTML(R));
 };
+/* view the report on screen before downloading */
+function fitRv(){const pp=$('rvPaper');pp.style.zoom=1;const w=$('rvWrap').clientWidth-20;const k=Math.max(0.6,Math.min(1,w/pp.offsetWidth));
+  pp.style.zoom=k;$('rvHint').hidden=k*pp.offsetWidth<=w+1;}
+$('rView').onclick=()=>{
+  const R=buildReport();if(!R.rows.length)return toast('Nothing to show for these filters');
+  $('rvTitle').textContent=R.title;
+  $('rvPaper').style.width=(R.head.length>6?1050:760)+'px';
+  $('rvPaper').innerHTML=reportHTML(R);
+  $('rv').hidden=false;document.body.style.overflow='hidden';fitRv();$('rv').scrollTop=0;$('rvClose').focus();
+};
+function closeRv(){$('rv').hidden=true;document.body.style.overflow='';}
+$('rvClose').onclick=closeRv;
+$('rv').addEventListener('click',e=>{if(e.target===$('rv'))closeRv();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('rv').hidden)closeRv();});
+window.addEventListener('resize',()=>{if(!$('rv').hidden)fitRv();});
+$('rvPdf').onclick=()=>$('rPdf').click();
+$('rvXls').onclick=()=>$('rXls').click();
+$('rvPrint').onclick=()=>$('rPrint').click();
 
 /* ---------- live sync ---------- */
 function onData(col){
