@@ -225,7 +225,7 @@ main .tbl table{min-width:600px}
       <div><label for="pMode">Mode of payment</label>
         <select id="pMode"><option>Cash</option><option>Online</option><option>Cheque</option></select></div>
       <div id="refBox"><label for="pRef" id="pRefLbl">Reference</label><input id="pRef"></div>
-      <div><label for="pRecv">Payment receiver name</label><input id="pRecv" list="dlRecv"></div>
+      <div><label for="pRecvSel" id="pRecvLbl">Cash collected by</label><select id="pRecvSel"></select><input id="pRecv" list="dlRecv" placeholder="Type the name" style="margin-top:6px" hidden></div>
     </div>
     <div class="totals">
       <div class="tot"><span>Total amount</span><b id="tTotal">₹0.00</b></div>
@@ -270,7 +270,7 @@ main .tbl table{min-width:600px}
       <div><label for="yAmt">Amount received ₹</label><input type="number" id="yAmt" min="0" step="0.01"></div>
       <div><label for="yMode">Mode of payment</label><select id="yMode"><option>Cash</option><option>Online</option><option>Cheque</option></select></div>
       <div id="yRefBox"><label for="yRef" id="yRefLbl">Reference</label><input id="yRef"></div>
-      <div><label for="yRecv">Payment receiver name</label><input id="yRecv" list="dlRecv"></div>
+      <div><label for="yRecvSel" id="yRecvLbl">Cash collected by</label><select id="yRecvSel"></select><input id="yRecv" list="dlRecv" placeholder="Type the name" style="margin-top:6px" hidden></div>
     </div>
     <div class="row" style="margin-top:12px"><button class="btn" id="btnSavePay">Save payment</button></div>
     <p class="hint">Saved payments are locked like challans.</p>
@@ -278,7 +278,7 @@ main .tbl table{min-width:600px}
   <div class="card">
     <h2>Payments received</h2>
     <div class="tbl"><table>
-      <thead><tr><th>Date</th><th>Client</th><th>Against</th><th class="n">Amount</th><th>Mode</th><th>Received by</th><th></th></tr></thead>
+      <thead><tr><th>Date</th><th>Client</th><th>Against</th><th class="n">Amount</th><th>Mode</th><th>Collected by / Account</th><th></th></tr></thead>
       <tbody id="payRows"></tbody>
     </table></div>
   </div>
@@ -460,6 +460,7 @@ main .tbl table{min-width:600px}
           <option value="low">Low stock list</option>
           <option value="purchases">Purchase list</option>
           <option value="returns">Goods return list</option>
+          <option value="collections">Payment collection (who collected / which account)</option>
         </select></div>
       <div id="rCliBox"><label for="rClient">Client</label><select id="rClient"></select></div>
       <div><label for="rCompany">Company</label><select id="rCompany"></select></div>
@@ -502,6 +503,16 @@ main .tbl table{min-width:600px}
     <p class="hint" id="fldHelp"></p>
   </div>
   <div id="coCards" class="adm"></div>
+  <div class="card adm">
+    <h2>Who receives payments</h2>
+    <p class="hint" style="margin-top:0">These lists fill the drop-down when a payment is recorded. One per line.</p>
+    <div class="grid">
+      <div><label for="sCollectors">Cash: people who collect cash</label><textarea id="sCollectors" rows="5" placeholder="Jatin Choksi&#10;Bhavesh Rasania&#10;Javid"></textarea></div>
+      <div><label for="sAccounts">Cheque / Online: bank accounts</label><textarea id="sAccounts" rows="5" placeholder="HDFC Current A/c ...1234 (Premier Pools)&#10;SBI A/c ...5678 (J P enterprise)"></textarea></div>
+    </div>
+    <p class="hint">For bank accounts, write the bank, the last 4 digits and whose account it is. Do not write the full account number.</p>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btnSaveRecv">Save lists</button></div>
+  </div>
   <div class="card adm">
     <h2>Printing</h2>
     <div class="grid"><div><label for="sCopies">Copies per print</label><select id="sCopies"><option value="1">1 (single)</option><option value="2">2 on one page (Original + Duplicate, with cutting line)</option></select></div></div>
@@ -697,7 +708,7 @@ function challanText(c){
 function paymentText(p){
   const co=coById(p.companyId);const ch=db.challans.find(c=>c.id===p.challanId);
   const bal=clientTotals(p.client,p.companyId).bal;
-  return `*${co.name}*\nPayment received - thank you!\n\nClient: ${p.client}\nDate: ${fmtDate(p.date)}\nAmount: *₹${num(p.amount)}*\nMode: ${p.mode}${p.ref?' ('+p.ref+')':''}\nAgainst: ${ch?'Challan '+ch.no:'On account'}${p.recv?'\nReceived by: '+p.recv:''}\n\n*Your balance: ₹${num(bal)}*`;
+  return `*${co.name}*\nPayment received - thank you!\n\nClient: ${p.client}\nDate: ${fmtDate(p.date)}\nAmount: *₹${num(p.amount)}*\nMode: ${p.mode}${p.ref?' ('+p.ref+')':''}\nAgainst: ${ch?'Challan '+ch.no:'On account'}${p.recv?'\n'+(isCash(p.mode)?'Collected by: ':'Deposited in: ')+p.recv:''}\n\n*Your balance: ₹${num(bal)}*`;
 }
 
 /* ---------- tabs ---------- */
@@ -818,7 +829,7 @@ $('btnScanCh').onclick=()=>openScan(code=>addScannedTo($('itemRows'),addRow,code
 function resetForm(){
   showNo();$('cDate').value=today();
   ['cClient','cPhone','cAddr','pRef','pRecv','cNote','dName','dMobile','dVeh'].forEach(i=>$(i).value='');
-  $('pPaid').value=0;$('pMode').value='Cash';$('dMode').value='Take Away';$('itemRows').innerHTML='';addRow();
+  $('pPaid').value=0;$('pMode').value='Cash';$('pRecvSel').value='';$('dMode').value='Take Away';$('itemRows').innerHTML='';addRow();
   refUI('pMode','refBox','pRefLbl');delivUI();showClientBal();unarm();
 }
 $('btnReset').onclick=()=>{resetForm();$('lastSaved').hidden=true;};
@@ -834,11 +845,12 @@ function collect(){
     if($('dMobile').value.replace(/\D/g,'').length<10){toast('Enter a 10-digit mobile number for delivery / pickup');return null;}
   }
   const t=calc();
+  if(t.paid>0&&!getRecv('pRecvSel','pRecv')){toast(isCash($('pMode').value)?'Choose who collected the cash':'Choose the account the money went into');return null;}
   const co=coById($('cCompany').value);const seq=nextSeq(co.id);
   return {id:Date.now(),companyId:co.id,seq,no:fmtNo(co,seq),co:{...co},locked:true,
     date:$('cDate').value,client:$('cClient').value.trim(),phone:$('cPhone').value.trim(),addr:$('cAddr').value.trim(),
     items,total:t.total,paid:t.paid,mode:t.paid>0?$('pMode').value:'Pending',ref:t.paid>0&&$('pMode').value!=='Cash'?$('pRef').value.trim():'',
-    recv:$('pRecv').value.trim(),note:$('cNote').value.trim(),
+    recv:t.paid>0?getRecv('pRecvSel','pRecv'):'',note:$('cNote').value.trim(),
     dMode:m,dName:m==='Porter'?'':$('dName').value.trim(),dMobile:m==='Porter'?'':$('dMobile').value.trim(),dVeh:m==='Take Away'?'':$('dVeh').value.trim()};
 }
 /* two-tap confirm (payments) */
@@ -939,7 +951,7 @@ function challanHTML(c,copyLabel,compact){
     <tr><td>Remaining balance</td><td style="text-align:right"><strong>₹ ${num(dueOf(c))}</strong></td></tr></table></div>
     <div><table><tr><td>Mode of payment</td><td><strong>${esc(c.mode)}</strong></td></tr>
     ${c.ref?`<tr><td>${c.mode==='Cheque'?'Cheque no.':'Txn ID'}</td><td>${esc(c.ref)}</td></tr>`:''}
-    <tr><td>Received by</td><td><strong>${esc(c.recv)}</strong></td></tr></table></div></div>
+    <tr><td>${isCash(c.mode)?'Collected by':'Deposited in'}</td><td><strong>${esc(c.recv)}</strong></td></tr></table></div></div>
   <div class="sig"><div>Receiver's signature</div><div>For ${esc(co.name)}</div></div></div>`;
 }
 function doPrint(html){$('printArea').innerHTML=html;setTimeout(()=>window.print(),120);}
@@ -956,7 +968,7 @@ function printReceipt(p){
   <tr><td>Amount</td><td><strong>₹ ${num(p.amount)}</strong></td></tr>
   <tr><td>Mode of payment</td><td>${esc(p.mode)}${p.ref?' ('+esc(p.ref)+')':''}</td></tr>
   <tr><td>Against</td><td>${ch?'Challan '+esc(ch.no):'On account'}</td></tr>
-  <tr><td>Received by</td><td>${esc(p.recv)}</td></tr>
+  <tr><td>${isCash(p.mode)?'Collected by':'Deposited in'}</td><td>${esc(p.recv)}</td></tr>
   <tr><td>Balance after this payment</td><td><strong>₹ ${num(bal)}</strong></td></tr></tbody></table>
   <div class="sig"><div>Payer's signature</div><div>For ${esc(co.name)}</div></div></div>`);
 }
@@ -991,7 +1003,7 @@ function viewChallan(c){
   $('vwPaper').innerHTML=challanHTML(c,'');
   const pays=db.payments.filter(p=>p.challanId===c.id),rets=db.returns.filter(t=>t.challanId===c.id);
   const lines=[`Saved by <strong>${esc(c.byName||'')}</strong>${c.savedAt?' on '+new Date(c.savedAt).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):''}`];
-  pays.forEach(p=>lines.push(`Payment ${fmtDate(p.date)}: <strong>${inr(p.amount)}</strong> · ${esc(p.mode)}${p.ref?' ('+esc(p.ref)+')':''}${p.recv?' · recd. by '+esc(p.recv):''}`));
+  pays.forEach(p=>lines.push(`Payment ${fmtDate(p.date)}: <strong>${inr(p.amount)}</strong> · ${esc(p.mode)}${p.ref?' ('+esc(p.ref)+')':''}${p.recv?' · '+recvWord(p.mode)+' '+esc(p.recv):''}`));
   rets.forEach(t=>lines.push(`Return ${esc(t.no)} ${fmtDate(t.date)}: <strong>${inr(t.total)}</strong> · ${esc(t.reason)}`));
   $('vwMore').innerHTML=`<p class="hint" style="margin:0;line-height:1.7">${lines.join('<br>')}</p>`;
   $('vwPay').hidden=dueOf(c)<=0;
@@ -1030,12 +1042,13 @@ $('btnSavePay').onclick=()=>{
   if(!n)return toast('Pick the client');
   if(!findClient(n)&&!db.challans.some(c=>key(c.client)===key(n)))return toast('This client is not in your list. Add them in Clients first');
   if(!(amt>0))return toast('Enter the amount received');
+  if(!getRecv('yRecvSel','yRecv'))return toast(isCash($('yMode').value)?'Choose who collected the cash':'Choose the account the money went into');
   if(!confirmTap($('btnSavePay')))return;
   const p={id:Date.now(),date:$('yDate').value||today(),client:(findClient(n)||{name:n}).name,companyId:+$('yCompany').value,
-    challanId:+$('yChallan').value||null,amount:amt,mode:$('yMode').value,ref:$('yMode').value==='Cash'?'':$('yRef').value.trim(),recv:$('yRecv').value.trim(),locked:true,
+    challanId:+$('yChallan').value||null,amount:amt,mode:$('yMode').value,ref:$('yMode').value==='Cash'?'':$('yRef').value.trim(),recv:getRecv('yRecvSel','yRecv'),locked:true,
     by:me.uid,byName:myName,savedAt:Date.now()};
   write(fs.collection('payments').doc(String(p.id)).set(p));
-  ['yAmt','yRef'].forEach(i=>$(i).value='');
+  ['yAmt','yRef','yRecv'].forEach(i=>$(i).value='');$('yRecvSel').value='';refreshRecv();
   toast('Payment of '+inr(amt)+' saved'+(navigator.onLine?'':'. It will upload when internet is back'));
 };
 function renderPays(){
@@ -1099,9 +1112,9 @@ function rowDetail(r,plain){
   if(r.type==='ch'){const co=r.c.co||coById(r.c.companyId);
     return `Challan <span class="cno">${esc(r.c.no)}</span>${multi?' · '+esc(co.name):''}`+(plain?'':`<br><span class="hint">${r.c.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</span>`);}
   if(r.type==='ret')return `Goods returned · ${plain?r.t.no:'<span class="cno">'+esc(r.t.no)+'</span>'} · ${esc(r.t.reason)}`+(plain?'':`<br><span class="hint">${r.t.items.map(i=>esc(i.name)+' × '+i.qty+(i.good?'':' (defective)')).join(', ')}</span>`);
-  if(r.type==='adv')return `Paid at delivery · ${esc(r.c.mode)}${r.c.ref?' ('+esc(r.c.ref)+')':''}${r.c.recv?' · recd. by '+esc(r.c.recv):''}`;
+  if(r.type==='adv')return `Paid at delivery · ${esc(r.c.mode)}${r.c.ref?' ('+esc(r.c.ref)+')':''}${r.c.recv?' · '+recvWord(r.c.mode)+' '+esc(r.c.recv):''}`;
   const ch=db.challans.find(c=>c.id===r.p.challanId);
-  return `Payment · ${esc(r.p.mode)}${r.p.ref?' ('+esc(r.p.ref)+')':''} · ${ch?'for '+esc(ch.no):'on account'}${r.p.recv?' · recd. by '+esc(r.p.recv):''}`;
+  return `Payment · ${esc(r.p.mode)}${r.p.ref?' ('+esc(r.p.ref)+')':''} · ${ch?'for '+esc(ch.no):'on account'}${r.p.recv?' · '+recvWord(r.p.mode)+' '+esc(r.p.recv):''}`;
 }
 function renderLedger(){
   if(!ledName)return;
@@ -1392,11 +1405,34 @@ function loadSet(){
     ${coFields.map(([f,l])=>`<div${f==='addr'?' style="grid-column:1/-1"':''}><label for="co${co.id}_${f}">${l}</label><input id="co${co.id}_${f}" value="${esc(co[f])}"></div>`).join('')}
     </div><p class="hint" style="margin:10px 0 0">Next challan: <span class="cno">${esc(fmtNo(co,nextSeq(co.id)))}</span></p></div>`).join('');
   $('sCopies').value=db.copies;
+  if(!$('set').contains(document.activeElement)||!['sCollectors','sAccounts'].includes(document.activeElement.id)){$('sCollectors').value=(db.collectors||[]).join('\n');$('sAccounts').value=(db.accounts||[]).join('\n');}
   pwUI();
 }
 $('btnMyName').onclick=()=>{const n=$('myNameIn').value.trim();if(!n)return toast('Enter your name');myName=n;$('who').textContent=n;
   write(fs.collection('users').doc(me.uid).set({name:n,email:me.email},{merge:true}));toast('Name saved');};
 const settingsRef=()=>fs.collection('settings').doc('main');
+/* ---------- payment receivers ---------- */
+const lines=id=>[...new Set($(id).value.split('\n').map(x=>x.trim()).filter(Boolean))];
+$('btnSaveRecv').onclick=()=>{write(settingsRef().set({collectors:lines('sCollectors'),accounts:lines('sAccounts')},{merge:true}));toast('Lists saved');};
+const isCash=m=>m==='Cash';
+const recvWord=m=>isCash(m)?'collected by':'deposited in';
+function recvUI(modeId,selId,inpId,lblId){
+  const cash=isCash($(modeId).value),list=(cash?db.collectors:db.accounts)||[],sel=$(selId),cur=sel.value;
+  $(lblId).textContent=cash?'Cash collected by':'Deposited in account';
+  $(inpId).placeholder=cash?'Type the name':'Type bank and account';
+  if(!list.length){sel.hidden=true;$(inpId).hidden=false;$(lblId).htmlFor=inpId;return;}
+  sel.hidden=false;$(lblId).htmlFor=selId;
+  sel.innerHTML='<option value="">— Select —</option>'+list.map(x=>`<option>${esc(x)}</option>`).join('')+'<option value="__other">Other (type)</option>';
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+  $(inpId).hidden=sel.value!=='__other';
+}
+function getRecv(selId,inpId){const sel=$(selId);return !sel.hidden&&sel.value&&sel.value!=='__other'?sel.value:$(inpId).value.trim();}
+function wireRecv(modeId,selId,inpId,lblId){
+  $(selId).onchange=()=>{$(inpId).hidden=$(selId).value!=='__other';if(!$(inpId).hidden)$(inpId).focus();};
+  $(modeId).addEventListener('change',()=>{$(selId).value='';$(inpId).value='';recvUI(modeId,selId,inpId,lblId);});
+}
+wireRecv('pMode','pRecvSel','pRecv','pRecvLbl');wireRecv('yMode','yRecvSel','yRecv','yRecvLbl');
+function refreshRecv(){recvUI('pMode','pRecvSel','pRecv','pRecvLbl');recvUI('yMode','yRecvSel','yRecv','yRecvLbl');}
 $('btnSaveSet').onclick=()=>{
   const cos=db.companies.map(co=>{const o={...co};coFields.forEach(([f])=>{o[f]=$(`co${co.id}_${f}`).value.trim();});return o;});
   if(!cos[0].name)cos[0].name='PREMIER POOLS';
@@ -1571,6 +1607,20 @@ function buildReport(){
       R.rows.push([R.rows.length+1,p.code||'',p.name,p.unit||'',v.opening,v.inQ,v.outQ,v.stock,+p.min||0,v.stock<0?'NEGATIVE':lw?'LOW':'OK']);});
     R.foot=['','',`${R.rows.length} product${R.rows.length===1?'':'s'}`,'','','','','','',''];
   }
+  if(type==='collections'){
+    R.title='Payment collection';R.sub=`${repCos()} · ${periodText()}`;
+    R.head=['Sr.','Date','Client','Against','Mode','Reference','Collected by / Account','Amount (Rs)'];R.num=[7];
+    const all=[];
+    db.challans.forEach(c=>{if(c.paid>0)all.push({date:c.date,client:c.client,against:c.no+' (at delivery)',mode:c.mode,ref:c.ref||'',recv:c.recv||'',amt:c.paid,cid:c.companyId});});
+    db.payments.forEach(p=>{const ch=db.challans.find(c=>c.id===p.challanId);all.push({date:p.date,client:p.client,against:ch?ch.no:'On account',mode:p.mode,ref:p.ref||'',recv:p.recv||'',amt:p.amount,cid:p.companyId});});
+    const list=all.filter(x=>(!cid||x.cid===+cid)&&inRange(x.date,f,t)).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+    let T=0;const by={};
+    list.forEach(x=>{T+=x.amt;const k=(isCash(x.mode)?'Cash: ':'Bank: ')+(x.recv||'not entered');by[k]=(by[k]||0)+x.amt;
+      R.rows.push([R.rows.length+1,fmtDate(x.date),x.client,x.against,x.mode,x.ref,x.recv,x.amt]);});
+    if(list.length){R.rows.push(['','','','','','','','']);
+      Object.keys(by).sort().forEach(k=>R.rows.push(['','','','','','','Total '+k,r2(by[k])]));}
+    R.foot=['','',`${list.length} payment${list.length===1?'':'s'}`,'','','','Grand total',r2(T)];
+  }
   if(type==='returns'){
     R.title='Goods return list';R.sub=`${repCos()} · ${periodText()}`;
     R.head=['Sr.','Return no.','Date','Client','Against challan','Reason','Items','Credit (Rs)'];R.num=[7];
@@ -1700,6 +1750,7 @@ $('rPrint').onclick=()=>{
 
 /* ---------- live sync ---------- */
 function onData(col){
+  if(col==='settings')refreshRecv();
   STK=stockMap();
   const lc=lowCount();$('lowBadge').hidden=!lc;$('lowBadge').textContent=lc;
   refreshLists();
@@ -1719,7 +1770,8 @@ function onData(col){
 function listenErr(e){console.error(e);if(e.code==='permission-denied')toast('Your login does not have access. Ask the owner.');}
 function listen(){
   subs.push(settingsRef().onSnapshot(d=>{const v=d.exists?d.data():{};
-    if(Array.isArray(v.companies)&&v.companies.length)db.companies=v.companies;db.copies=v.copies||'2';db.delPass=v.delPass||'';onData('settings');},listenErr));
+    if(Array.isArray(v.companies)&&v.companies.length)db.companies=v.companies;db.copies=v.copies||'2';db.delPass=v.delPass||'';
+    db.collectors=Array.isArray(v.collectors)?v.collectors:[];db.accounts=Array.isArray(v.accounts)?v.accounts:[];onData('settings');},listenErr));
   const order={returns:(a,b)=>(b.savedAt||b.id)-(a.savedAt||a.id),purchases:(a,b)=>(b.date<a.date?-1:b.date>a.date?1:b.id-a.id),challans:(a,b)=>(b.savedAt||b.id)-(a.savedAt||a.id),payments:(a,b)=>b.id-a.id,clients:(a,b)=>a.name.localeCompare(b.name),products:(a,b)=>a.name.localeCompare(b.name)};
   Object.keys(order).forEach(col=>subs.push(fs.collection(col).onSnapshot(s=>{
     db[col]=s.docs.map(d=>({...d.data(),_id:d.id})).sort(order[col]);onData(col);},listenErr)));
@@ -1768,7 +1820,7 @@ async function startSession(u){
 function netUI(){$('net').hidden=navigator.onLine;}
 window.addEventListener('online',netUI);window.addEventListener('offline',netUI);netUI();
 $('yDate').value=today();refUI('yMode','yRefBox','yRefLbl');resetPur();resetRet();
-refreshLists();resetForm();loadFolder();
+refreshLists();resetForm();loadFolder();refreshRecv();
 const configured=CFG.firebase&&CFG.firebase.apiKey&&!/PASTE/i.test(CFG.firebase.apiKey)&&window.firebase;
 if(!configured)gate('gSetup');
 else{
