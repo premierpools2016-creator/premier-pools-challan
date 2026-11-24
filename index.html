@@ -1551,7 +1551,7 @@ function buildReport(){
   const R={type,num:[],rows:[],foot:null};
   if(type==='clients'){
     R.title='Client list';R.sub=`${repCos()} · as of ${fmtDate(today())}`;
-    R.head=['Sr.','Client','Mobile','Address','Challans','Purchases (Rs)','Paid (Rs)','Returned (Rs)','Balance (Rs)'];R.num=[5,6,7,8];
+    R.head=['Sr.','Client','Mobile','Address','Challans','Purchases (Rs)','Paid (Rs)','Returned (Rs)','Balance (Rs)'];R.num=[5,6,7,8];R.red=[8];
     let P=0,Y=0,B=0,N=0,RT=0;
     allClientNames().forEach((n,i)=>{const tt=clientTotals(n,cid);const c=findClient(n)||{};
       if(cid&&!tt.ch.length&&!tt.py.length&&!tt.rt.length)return;
@@ -1560,7 +1560,7 @@ function buildReport(){
   }
   if(type==='challans'){
     R.title='Challan list';R.sub=`${repCos()} · ${periodText()}`;
-    R.head=['Sr.','Challan no.','Date','Client','Items','Total (Rs)','Paid at delivery (Rs)','Paid later (Rs)','Balance (Rs)','Delivery','Made by'];R.num=[5,6,7,8];
+    R.head=['Sr.','Challan no.','Date','Client','Items','Total (Rs)','Paid at delivery (Rs)','Paid later (Rs)','Balance (Rs)','Delivery','Made by'];R.num=[5,6,7,8];R.red=[8];
     const list=db.challans.filter(c=>(!cid||c.companyId===+cid)&&inRange(c.date,f,t)).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.companyId-b.companyId)||(a.seq-b.seq));
     let T=0,A=0,L=0,D=0;
     list.forEach((c,i)=>{const later=r2(laterPaid(c)),due=dueOf(c);T+=c.total;A+=c.paid;L+=later;D+=due;
@@ -1569,7 +1569,7 @@ function buildReport(){
   }
   if(type==='pending'){
     R.title='Remaining payment list';R.sub=`${repCos()} · ${periodText()} · as of ${fmtDate(today())}`;
-    R.head=['Sr.','Client','Mobile','Challan no.','Date','Days','Total (Rs)','Paid (Rs)','Balance (Rs)'];R.num=[6,7,8];
+    R.head=['Sr.','Client','Mobile','Challan no.','Date','Days','Total (Rs)','Paid (Rs)','Balance (Rs)'];R.num=[6,7,8];R.red=[8];
     const now=new Date(today());
     const list=db.challans.filter(c=>(!cid||c.companyId===+cid)&&inRange(c.date,f,t)&&dueOf(c)>0)
       .sort((a,b)=>a.client.localeCompare(b.client)||(a.date<b.date?-1:1));
@@ -1586,7 +1586,7 @@ function buildReport(){
     const c=n?findClient(n)||{}:{};
     R.sub=`${repCos()} · ${periodText()}`+(n&&c.phone?` · Mobile ${c.phone}`:'');
     R.head=n?['Date','Details','Purchase (Rs)','Paid (Rs)','Balance (Rs)']:['Client','Date','Details','Purchase (Rs)','Paid (Rs)','Balance (Rs)'];
-    const o=n?0:1;R.num=[2+o,3+o,4+o];
+    const o=n?0:1;R.num=[2+o,3+o,4+o];R.red=[4+o];
     let DR=0,CR=0;
     names.forEach(name=>{
       const {rows}=ledgerRows(name,cid);if(!rows.length)return;
@@ -1598,7 +1598,7 @@ function buildReport(){
         R.rows.push([...(n?[]:[name]),fmtDate(r.date),rowDetail(r,true).replace(/<[^>]+>/g,'').replace(/&amp;/g,'&'),r.dr||'',r.cr||'',r.bal]);});
       if(!n)R.rows.push(['','','Closing balance of '+name,'','',inside.length?inside[inside.length-1].bal:open]);
     });
-    R.foot=n?['','Total for period',r2(DR),r2(CR),R.rows.length?R.rows[R.rows.length-1][4]:0]:['','','Total for period',r2(DR),r2(CR),''];
+    R.foot=n?['','Total for period',r2(DR),r2(CR),R.rows.length?R.rows[R.rows.length-1][4]:0]:['','','Total for period',r2(DR),r2(CR),r2(R.rows.filter(r=>String(r[2]).startsWith('Closing balance')).reduce((a,r)=>a+(+r[5]||0),0))];
   }
   if(type==='stock'||type==='low'){
     R.title=type==='low'?'Low stock list':'Stock report';R.sub=`All companies (shared stock) · as of ${fmtDate(today())}`;
@@ -1647,14 +1647,15 @@ function fillRepClients(){const sel=$('rClient'),cur=sel.value;
   sel.innerHTML='<option value="">All clients</option>'+allClientNames().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
   if([...sel.options].some(o=>o.value===cur))sel.value=cur;}
 const cell=(v,isNum)=>isNum&&v!==''?num(v):esc(v);
+const isDue=(R,i,v)=>(R.red||[]).includes(i)&&typeof v==='number'&&v>0.004;
 function renderReport(){
   coOptions($('rCompany'),true);fillRepClients();repUI();
   const R=buildReport();
   $('rTitle').textContent=R.title;$('rSub').textContent=R.sub;
   $('rHint').textContent=(R.note?R.note+' ':'')+`${R.rows.length} row${R.rows.length===1?'':'s'}.`;
   $('rTable').innerHTML=`<thead><tr>${R.head.map((h,i)=>`<th class="${R.num.includes(i)?'n':''}">${esc(h)}</th>`).join('')}</tr></thead>
-   <tbody>${R.rows.length?R.rows.map(r=>`<tr>${r.map((v,i)=>`<td class="${R.num.includes(i)?'n money':''}">${cell(v,R.num.includes(i))}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${R.head.length}" class="hint">Nothing to show for these filters.</td></tr>`}</tbody>
-   ${R.foot&&R.rows.length?`<tfoot><tr>${R.foot.map((v,i)=>`<th class="${R.num.includes(i)?'n':''}" style="color:var(--ink)">${cell(v,R.num.includes(i)&&typeof v==='number')}</th>`).join('')}</tr></tfoot>`:''}`;
+   <tbody>${R.rows.length?R.rows.map(r=>`<tr>${r.map((v,i)=>`<td class="${R.num.includes(i)?'n money':''}"${isDue(R,i,v)?' style="color:var(--warn);font-weight:700"':''}>${cell(v,R.num.includes(i))}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${R.head.length}" class="hint">Nothing to show for these filters.</td></tr>`}</tbody>
+   ${R.foot&&R.rows.length?`<tfoot><tr>${R.foot.map((v,i)=>`<th class="${R.num.includes(i)?'n':''}" style="color:${isDue(R,i,v)?'var(--warn)':'var(--ink)'}">${cell(v,R.num.includes(i)&&typeof v==='number')}</th>`).join('')}</tr></tfoot>`:''}`;
 }
 ['rType','rCompany','rClient','rFrom','rTo'].forEach(id=>$(id).addEventListener('change',renderReport));
 /* ---------- report folder (computer browsers that allow folder access) ---------- */
@@ -1734,6 +1735,8 @@ $('rPdf').onclick=()=>withLib($('rPdf'),[JSPDF_SRC,AUTOTABLE_SRC],async()=>{
   doc.autoTable({startY:37,head:[R.head],body:R.rows.map(r=>r.map(fmt)),foot:R.foot?[R.foot.map(fmt)]:undefined,showFoot:'lastPage',
     styles:{fontSize:8,cellPadding:1.6,lineColor:[180,180,180],lineWidth:0.1},headStyles:{fillColor:[10,111,138]},footStyles:{fillColor:[227,241,244],textColor:20,fontStyle:'bold'},
     columnStyles:colStyles,margin:{left:14,right:14},
+    didParseCell:d=>{const src=d.section==='body'?R.rows[d.row.index]:d.section==='foot'?R.foot:null;
+      if(src&&isDue(R,d.column.index,src[d.column.index])){d.cell.styles.textColor=[200,30,30];d.cell.styles.fontStyle='bold';}},
     didDrawPage:d=>{doc.setFontSize(8);doc.text(`Page ${doc.internal.getNumberOfPages()} · printed ${fmtDate(today())}`,doc.internal.pageSize.getWidth()-14,doc.internal.pageSize.getHeight()-8,{align:'right'});}});
   if(R.note){doc.setFontSize(8);doc.text(doc.splitTextToSize(R.note,doc.internal.pageSize.getWidth()-28),14,doc.lastAutoTable.finalY+6);}
   await saveReport(doc.output('blob'),fileName(R,'pdf'),R);
@@ -1744,8 +1747,8 @@ $('rPrint').onclick=()=>{
   const fmt=(v,i)=>R.num.includes(i)&&typeof v==='number'?num(v):esc(v);
   doPrint(`<div class="pc">${coHead(co,R.title.toUpperCase().slice(0,40),esc(R.sub))}
   <table><thead><tr>${R.head.map((h,i)=>`<th style="${R.num.includes(i)?'text-align:right':''}">${esc(h)}</th>`).join('')}</tr></thead>
-  <tbody>${R.rows.map(r=>`<tr>${r.map((v,i)=>`<td style="${R.num.includes(i)?'text-align:right':''}">${fmt(v,i)}</td>`).join('')}</tr>`).join('')}</tbody>
-  ${R.foot?`<tfoot><tr>${R.foot.map((v,i)=>`<th style="${R.num.includes(i)?'text-align:right':''}">${fmt(v,i)}</th>`).join('')}</tr></tfoot>`:''}</table></div>`);
+  <tbody>${R.rows.map(r=>`<tr>${r.map((v,i)=>`<td style="${R.num.includes(i)?'text-align:right;':''}${isDue(R,i,v)?'color:#c81e1e!important;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact':''}">${fmt(v,i)}</td>`).join('')}</tr>`).join('')}</tbody>
+  ${R.foot?`<tfoot><tr>${R.foot.map((v,i)=>`<th style="${R.num.includes(i)?'text-align:right;':''}${isDue(R,i,v)?'color:#c81e1e!important;-webkit-print-color-adjust:exact;print-color-adjust:exact':''}">${fmt(v,i)}</th>`).join('')}</tr></tfoot>`:''}</table></div>`);
 };
 
 /* ---------- live sync ---------- */
